@@ -151,7 +151,7 @@ workflows:
   dev:
     when:
       matches:
-        pattern: "^dev$"
+        pattern: "^develop$"
         value: << pipeline.git.branch >>
     jobs:
       - run-tests
