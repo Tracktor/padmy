@@ -1,0 +1,25 @@
+# We want a default sampling size of 20% of each table count
+sample: 20
+# We want to sample `schema_1` and `schema_2`
+schemas:
+  - schema_1
+  # We want a default size of 30% for the tables of this schema
+  - name: schema_2
+    sample: 30
+
+tables:
+  # We want a sample size of 10% for this table
+  - schema: public
+    table: table_1
+    sample: 10
+    fields:
+      - column: foo
+        type: EMAIL
+        # Extra arguments
+        domain: my-domain.fr
+
+
+  # We want to ignore this table when sampling
+  - schema: public
+    table: table_2
+    ignore: True

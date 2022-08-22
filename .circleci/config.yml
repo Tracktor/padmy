@@ -1,0 +1,193 @@
+version: 2.1
+
+orbs:
+  sre: tracktor/ci-tools@0.1.5
+
+references:
+  staging_context: &staging_context
+    - docker
+  production_context: &production_context
+    - docker
+
+executors:
+
+  build-docker:
+    docker:
+      - image: cimg/base:current
+
+  export-poetry:
+    docker:
+      - image: cimg/python:3.10
+
+  tests:
+    docker:
+      - image: cimg/python:3.10
+      - image: cimg/postgres:13.6
+        environment:
+          POSTGRES_PASSWORD: postgres
+
+
+jobs:
+
+  # Testing
+
+  run-tests:
+    executor: tests
+    steps:
+      - checkout
+      - run:
+          name: Installing psql
+          command: sudo apt-get update && sudo apt-get install postgresql
+      - sre/run-python-tests:
+          extras: '-E network'
+          before-steps:
+            - run:
+                name: Initializing DB
+                command: ./tests/static/init-pg.sh
+                environment:
+                  PGHOST: 127.0.0.1
+                  PGUSER: postgres
+                  PGPASSWORD: postgres
+                  INIT_FILE: ./tests/init.sql
+                  SQL_FOLDER: ./tests/static
+
+  # Docker Images
+
+  export-requirements:
+    executor: export-poetry
+    steps:
+      - checkout
+      - sre/export-poetry:
+          extras: '--without-hashes'
+
+  export-requirements-network:
+    executor: export-poetry
+    steps:
+      - checkout
+      - sre/export-poetry:
+          extras: '--without-hashes -E network'
+
+  # Build
+
+  build-docker:
+    executor: build-docker
+    steps:
+      - setup_remote_docker:
+          version: 20.10.14
+      - checkout
+      - attach_workspace:
+          at: .
+      - sre/load-poetry-version
+      - sre/build-docker:
+          image_name: 'tracktor/padmy'
+          version: "${VERSION}"
+          latest_version: 'latest'
+          registry_pwd: $CONTAINER_REGISTRY_PWD
+          registry_user: $CONTAINER_REGISTRY_USER
+
+  build-docker-network:
+    executor: build-docker
+    steps:
+      - setup_remote_docker:
+          version: 20.10.14
+      - checkout
+      - attach_workspace:
+          at: .
+      - sre/load-poetry-version
+      - sre/build-docker:
+          image_name: 'tracktor/padmy'
+          version: "${VERSION}-network"
+          latest_version: 'latest-network'
+          registry_pwd: $CONTAINER_REGISTRY_PWD
+          registry_user: $CONTAINER_REGISTRY_USER
+
+  # Publish
+
+
+  build-publish-docker:
+    executor: build-docker
+    steps:
+      - setup_remote_docker:
+          version: 20.10.14
+      - checkout
+      - attach_workspace:
+          at: .
+      - sre/load-poetry-version
+      - sre/build-docker:
+          image_name: 'tracktor/padmy'
+          version: ${VERSION}
+          latest_version: 'latest'
+          publish: true
+          registry_pwd: $CONTAINER_REGISTRY_PWD
+          registry_user: $CONTAINER_REGISTRY_USER
+
+  build-publish-docker-network:
+    executor: build-docker
+    steps:
+      - setup_remote_docker:
+          version: 20.10.14
+      - checkout
+      - attach_workspace:
+          at: .
+      - sre/load-poetry-version
+      - sre/build-docker:
+          image_name: 'tracktor/padmy'
+          version: ${VERSION}-network
+          latest_version: 'latest-network'
+          publish: true
+          registry_pwd: $CONTAINER_REGISTRY_PWD
+          registry_user: $CONTAINER_REGISTRY_USER
+
+workflows:
+
+  features:
+    when:
+      matches:
+        pattern: "^(feat|feature)\\/.*$"
+        value: << pipeline.git.branch >>
+    jobs:
+      - run-tests
+
+  dev:
+    when:
+      matches:
+        pattern: "^dev$"
+        value: << pipeline.git.branch >>
+    jobs:
+      - run-tests
+      - export-requirements
+      - export-requirements-network
+      - build-docker:
+          requires: [
+            run-tests,
+            export-requirements
+          ]
+          context: *staging_context
+      - build-docker-network:
+          requires: [
+            run-tests,
+            export-requirements-network
+          ]
+          context: *staging_context
+
+  production:
+    when:
+      matches:
+        pattern: "^master$"
+        value: << pipeline.git.branch >>
+    jobs:
+      - run-tests
+      - export-requirements
+      - export-requirements-network
+      - build-publish-docker:
+          requires: [
+            run-tests,
+            export-requirements
+          ]
+          context: *production_context
+      - build-publish-docker-network:
+          requires: [
+            run-tests,
+            export-requirements-network
+          ]
+          context: *production_context
