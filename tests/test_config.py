@@ -7,6 +7,24 @@ import pytest
 from padmy.config import Config, ConfigSchema, ConfigTable, AnoFields
 from .utils import pprint_dataclass_diff
 
+CONFIG_LITE = """
+sample: 20
+schemas:
+  - schema_1
+"""
+
+
+def get_config_lite_expected():
+    schemas = [
+        ConfigSchema(schema='schema_1'),
+    ]
+    expected = Config(
+        sample=20,
+        schemas=schemas,
+    )
+    return expected
+
+
 CONFIG_FULL = """
 sample: 20
 schemas:
@@ -70,6 +88,7 @@ def get_custom_fields_expected():
 
 
 @pytest.mark.parametrize('config, expected', [
+    (CONFIG_LITE, get_config_lite_expected()),
     (CONFIG_FULL, get_config_full_expected()),
     (CONFIG_CUSTOM_TABLE_FIELDS, get_custom_fields_expected())
 ])
