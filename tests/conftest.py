@@ -20,6 +20,11 @@ PG_URL = f'postgresql://{PG_USER}:{PG_PASSWORD}@{PG_HOST}:{PG_PORT}'
 STATIC_DIR = Path(os.path.dirname(__file__)) / 'static'
 
 
+@pytest.fixture(scope='session', autouse=True)
+def set_envs():
+    os.environ['PG_PASSWORD'] = PG_PASSWORD
+    os.environ['PG_USER'] = PG_USER
+
 @pytest.fixture(scope='session')
 def engine() -> Iterator[connection]:
     conn = psycopg2.connect(f'{PG_URL}/{PG_DATABASE}')

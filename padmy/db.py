@@ -7,7 +7,7 @@ from rich.console import Console
 from rich.table import Table as RTable
 from typing_extensions import Self
 
-from padmy.config import Config
+from padmy.config import Config, ConfigSchema, ConfigTable
 from padmy.utils import get_first, get_conn
 
 
@@ -245,15 +245,21 @@ class Database:
         Loads the sample sizes for each tables from the config file.
         Tables need to have been loaded first
         """
-        _schemas = {schema.schema: schema for schema in config.schemas}
-        _tables = {f'{_table.schema}.{_table.table}': _table for _table in config.tables}
+        _schemas: dict[str, ConfigSchema] = {schema.schema: schema for schema in config.schemas}
+        _tables: dict[str, ConfigTable] = {f'{_table.schema}.{_table.table}': _table for _table in config.tables}
         for _table in self.tables:
             _schema_sample = _schemas.get(_table.schema)
             _table_sample = _tables.get(_table.full_name)
-            _table.sample_size = get_first(_table_sample,
-                                           _schema_sample,
-                                           config.sample,
-                                           fn=lambda x: x is not None)
+            # : ConfigTable | ConfigSchema | Config
+            _config = get_first(_table_sample,
+                                _schema_sample,
+                                config,
+                                fn=lambda x: x is not None)
+            if _config is None:
+                raise ValueError('config must not be empty')
+            if _config.sample is None:
+                raise ValueError('sample_size must not be empty')
+            _table.sample_size = int(_config.sample)
 
 
 def pretty_print_stats(database: Database):

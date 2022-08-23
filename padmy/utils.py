@@ -179,10 +179,16 @@ async def insert_many(conn: asyncpg.Connection,
     await conn.executemany(query, _data)
 
 
-def get_first(*it, fn: Callable):
+from typing import TypeVar
+
+X = TypeVar('X')
+
+
+def get_first(*it: X, fn: Callable) -> X | None:
     for v in it:
         if fn(v):
             return v
+    return None
 
 
 async def get_conn(pool: asyncpg.Pool, fn: Callable):

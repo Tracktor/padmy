@@ -96,16 +96,15 @@ def test_sample_db_circular_mutiple(loop, aengine):
 
     loop.run_until_complete(test())
 
-# @pytest.mark.parametrize('table, child_table, expected', [
-#     (
-#             get_table_no_constraints(),
-#             get_table_no_constraints(),
-#             "SELECT t.* from _public_table_1_tmp t"
-#     ),
-# ])
-# def test_get_insert_child_fk_data_query(table, child_table, expected):
-#     from padmy.sampling import get_insert_child_fk_data_query
-#
-#     query = get_insert_child_fk_data_query(table, child_table)
-#     print(query)
-#     assert query == textwrap.dedent(expected).strip()
+
+def test_get_layout(loop):
+    from padmy.db import Database
+    from padmy.sampling.viz import get_layout, convert_db
+
+    db = Database(name='test')
+    table = get_table_multiple_constraints()
+    table.count = 0
+    db.tables = [table]
+    g = convert_db(db)
+    layout = get_layout(g)
+    assert layout is not None
