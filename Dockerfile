@@ -1,7 +1,7 @@
 FROM python:3.10-alpine
 
 
-RUN apk --no-cache add bash postgresql-client && \
+RUN apk --no-cache add bash postgresql-client-13 && \
     addgroup user && \
     adduser -s /bin/bash -D -G user user
 
