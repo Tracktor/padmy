@@ -25,8 +25,9 @@ def set_envs():
     os.environ['PG_PASSWORD'] = PG_PASSWORD
     os.environ['PG_USER'] = PG_USER
 
+
 @pytest.fixture(scope='session')
-def engine() -> Iterator[connection]:
+def engine() -> connection: # type: ignore
     conn = psycopg2.connect(f'{PG_URL}/{PG_DATABASE}')
 
     yield conn
@@ -51,7 +52,7 @@ def apool(loop):
 
 
 @pytest.fixture(scope='session')
-def loop() -> Iterator[asyncio.AbstractEventLoop]:
+def loop():
     loop = asyncio.new_event_loop()
     yield loop
     loop.close()

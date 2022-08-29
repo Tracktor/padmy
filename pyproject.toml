@@ -6,7 +6,7 @@ authors = ["andarius <julien.brayere@tracktor.fr>"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-piou = "^0.10.3"
+piou = "^0.10.5"
 asyncpg = "^0.26.0"
 PyYAML = "^6.0"
 typing-extensions = "^4.3.0"

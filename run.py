@@ -10,6 +10,7 @@ from padmy.anonymize import anonymize_db
 from padmy.config import Config
 from padmy.db import pretty_print_stats, pprint_compared_dbs, Database
 from padmy.logs import setup_logging, logs
+from padmy.migration import migration
 from padmy.sampling import sample_database, copy_database
 from padmy.utils import get_pg_root
 
@@ -17,6 +18,8 @@ cli = Cli('Padmy utility commands')
 
 cli.add_option('-v', '--verbose', help='Verbosity')
 cli.add_option('-vv', '--verbose2', help='Increased verbosity')
+
+cli.add_command_group(migration)
 
 
 def on_process(verbose: bool = False, verbose2: bool = False):

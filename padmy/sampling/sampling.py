@@ -9,7 +9,7 @@ from ..config import Config
 from ..db import Database, Table, FKConstraint
 from ..logs import logs
 from ..utils import (
-    check_cmd, restore_db, dump_db, create_db, drop_db, exec_psql, iterate_pg,
+    check_cmd, pg_restore, pg_dump, create_db, drop_db, exec_psql, iterate_pg,
     check_extension_exists, check_tmp_table_exists,
     insert_many
 )
@@ -29,16 +29,17 @@ def copy_database(database: str,
         check_cmd(cmd)
 
     with tempfile.NamedTemporaryFile(suffix='.dump') as tmp_file:
-        dump_db(schemas=schemas,
+        pg_dump(schemas=schemas,
                 dump_path=tmp_file.name,
-                database=database)
+                database=database,
+                options=['-Fc', '--schema-only'])
         drop_db(target_db, if_exists=True)
         create_db(database=target_db)
 
         if 'public' in schemas or drop_public:
             exec_psql(target_db, 'DROP SCHEMA public;')
 
-        restore_db(dump_path=tmp_file.name,
+        pg_restore(dump_path=tmp_file.name,
                    database=target_db)
 
 

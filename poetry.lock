@@ -73,7 +73,7 @@ test = ["flake8 (==3.7.8)", "hypothesis (==3.55.3)"]
 
 [[package]]
 name = "coverage"
-version = "6.4.2"
+version = "6.4.4"
 description = "Code coverage measurement for Python"
 category = "dev"
 optional = false
@@ -283,7 +283,7 @@ pyparsing = ">=2.0.2,<3.0.5 || >3.0.5"
 
 [[package]]
 name = "piou"
-version = "0.10.3"
+version = "0.10.5"
 description = "A CLI toolkit"
 category = "main"
 optional = false
@@ -487,7 +487,7 @@ network = ["networkx", "dash", "dash-cytoscape"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "f3f9214a6b5efedc954adfae1c7153c07bf088e749176de75de03c79070151c3"
+content-hash = "efe9eb52a78a27bc1ba4d5baf7501900d375b24d552b4a081e952f55c0678ffb"
 
 [metadata.files]
 asyncpg = []

@@ -1,4 +1,16 @@
+import logging
+
+import pytest
+
 from .conftest import STATIC_DIR
+from .utils import exec_req
+
+
+@pytest.fixture(autouse=True)
+def restore_log_lvl():
+    from padmy.logs import logs
+    yield
+    logs.setLevel(logging.INFO)
 
 
 def test_run_anonymize():
@@ -9,6 +21,15 @@ def test_run_anonymize():
                       '-f', str(STATIC_DIR / 'config.yml'))
 
 
+@pytest.fixture()
+def setup_test_schemas(engine):
+    exec_req(engine, 'DROP SCHEMA IF EXISTS test CASCADE')
+    exec_req(engine, 'CREATE SCHEMA test')
+    yield
+    exec_req(engine, 'DROP SCHEMA test CASCADE')
+
+
+@pytest.mark.usefixtures('setup_test_db', 'setup_test_schemas')
 def test_run_sample(capsys, loop):
     from run import cli
 

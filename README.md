@@ -2,11 +2,9 @@
 
 CLI utility functions for Postgresql such as **sampling** and **anonymization**.
 
+## Installation
 
-## Installation  
-
-Run `poetry install`  to install the python packages. 
-
+Run `poetry install`  to install the python packages.
 
 ## 1. Database Exploration
 
@@ -64,7 +62,7 @@ SELECT generate_series(0, 10);
 
 ## 2. Sampling
 
-You can quickly sample (ie: take a subset) of a database by simply running
+You can quickly sample (ie: take a subset) of a database by running
 
 ```bash
 poetry run cli sample \
@@ -74,7 +72,7 @@ poetry run cli sample \
 ```
 
 This will sample the `test` database into a new `test-sampled` database, copy of the
-original one, keeping if possible **20%** of the original database.
+original one, keeping if possible (see: [Annexe](#Known-limitations)) **20%** of the original database.
 
 You can choose how to sample with more granularity by passing a configuration file.
 Here is an example:
@@ -95,6 +93,91 @@ tables:
     table: table_3
     sample: 10
 ```
+
+## 3. Migration utils
+
+**Setting up**
+
+This library includes a migration utility to help you evolve your data model.
+In order to use it, start by setting up the migration table:
+
+```bash
+poetry run cli -vv migrate setup --db postgres
+```
+
+This will create the `public.migration` table that stores all the migration / rollback that
+will be applied.
+
+**Setting up the Schemas**
+
+Now that we are all setup, let's create our first sql file that will create the schema:
+
+```bash
+poetry run cli -vv migrate new-sql 1 --sql-dir /tmp/sql
+```  
+
+Add `CREATE SCHEMA general;` to the file.
+
+Then apply the modifications to the database:
+
+```bash
+poetry run cli -vv migrate apply-sql --sql-dir /tmp/sql --db postgres 
+```
+
+Notes:
+This will run through all the files in the `/tmp/sql` folder (in order) run them.
+Sql files here **need to be IDEMPOTENT**
+
+**Creating a first migration**
+
+Now, lets create our first migration:
+
+```bash
+mkdir -p /tmp/migrations # You can choose a different folder to store your migrations
+poetry run cli -vv migrate new --sql-dir /tmp/migrations
+```
+
+This will create 2 new files:
+
+- **up**: `{timestamp}-{migration_id}-up.sql` that contains your
+  migration to apply to the database.
+- **down**: `{timestamp}-{migration_id}-down.sql` that contains the code to revert your changes.
+
+Let's now modify the `up.sql` file with:
+
+```sql
+CREATE TABLE IF NOT EXISTS general.test
+(
+    id  int primary key,
+    foo int
+);
+
+CREATE TABLE IF NOT EXISTS general.test2
+(
+    id  serial primary key,
+    foo text
+);
+```
+
+and check that the migration is valid:
+
+```bash
+poetry run cli -vv migrate verify --sql-dir /tmp/migrations
+``` 
+
+Because we did not add anything to the `down.sql` file, the command returns an error.
+Let's modify it to make the command pass:
+
+```sql
+DROP table general.test;
+DROP table general.test2;
+``` 
+
+```bash
+poetry run cli -vv migrate verify --sql-dir /tmp/migrations
+``` 
+
+We are all good !
 
 ### Known limitations
 

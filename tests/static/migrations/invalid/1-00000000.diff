@@ -1,0 +1,65 @@
+--- 00000000-before.sql
+
++++ 00000000-after.sql
+
+@@ -25,6 +25,59 @@
+
+
+ ALTER SCHEMA general OWNER TO postgres;
+
++SET default_tablespace = '';
++
++SET default_table_access_method = heap;
++
++--
++-- Name: test2; Type: TABLE; Schema: general; Owner: postgres
++--
++
++CREATE TABLE general.test2 (
++    id integer NOT NULL,
++    foo text
++);
++
++
++ALTER TABLE general.test2 OWNER TO postgres;
++
++--
++-- Name: test2_id_seq; Type: SEQUENCE; Schema: general; Owner: postgres
++--
++
++CREATE SEQUENCE general.test2_id_seq
++    AS integer
++    START WITH 1
++    INCREMENT BY 1
++    NO MINVALUE
++    NO MAXVALUE
++    CACHE 1;
++
++
++ALTER TABLE general.test2_id_seq OWNER TO postgres;
++
++--
++-- Name: test2_id_seq; Type: SEQUENCE OWNED BY; Schema: general; Owner: postgres
++--
++
++ALTER SEQUENCE general.test2_id_seq OWNED BY general.test2.id;
++
++
++--
++-- Name: test2 id; Type: DEFAULT; Schema: general; Owner: postgres
++--
++
++ALTER TABLE ONLY general.test2 ALTER COLUMN id SET DEFAULT nextval('general.test2_id_seq'::regclass);
++
++
++--
++-- Name: test2 test2_pkey; Type: CONSTRAINT; Schema: general; Owner: postgres
++--
++
++ALTER TABLE ONLY general.test2
++    ADD CONSTRAINT test2_pkey PRIMARY KEY (id);
++
++
+ --
+ -- PostgreSQL database dump complete
+ --

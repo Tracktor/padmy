@@ -1,9 +1,12 @@
 import subprocess
-from typing import Sequence, AsyncIterator, Callable
+from importlib import reload
+from pathlib import Path
+from typing import Sequence, AsyncIterator, Callable, TypeVar
 
 import asyncpg
 from piou import Option, Derived, Password
 
+from padmy import env
 from .env import PG_HOST, PG_PORT, PG_USER, PG_DATABASE, PG_PASSWORD
 from .logs import logs
 
@@ -37,7 +40,9 @@ async def get_pg(
 
 
 def exec_cmd(cmd: Sequence[str | int],
-             env: dict | None = None) -> str:
+             env: dict | None = None,
+             *,
+             on_stderr: Callable | None = None) -> str:
     _cmd = cmd if isinstance(cmd, str) else ' '.join(str(x) for x in cmd)
     logs.debug(f'Executing cmd: {_cmd}')
     stdout, stderr = subprocess.Popen(_cmd,
@@ -46,7 +51,10 @@ def exec_cmd(cmd: Sequence[str | int],
                                       stderr=subprocess.PIPE,
                                       env=env).communicate()
     if stderr:
-        logs.warning(stderr.decode('utf-8'))
+        _msg = stderr.decode('utf-8')
+        logs.warning(_msg)
+        if on_stderr:
+            on_stderr(_msg)
     return stdout.decode('utf-8')
 
 
@@ -66,30 +74,40 @@ def check_cmd(cmd: str):
 
 
 def get_pg_envs():
-    return {'PGPASSWORD': PG_PASSWORD,
-            'PGUSER': PG_USER,
-            'PGHOST': PG_HOST,
-            'PGPORT': str(PG_PORT)}
+    reload(env)
+    return {'PGPASSWORD': env.PG_PASSWORD,
+            'PGUSER': env.PG_USER,
+            'PGHOST': env.PG_HOST,
+            'PGPORT': str(env.PG_PORT)}
 
 
-def dump_db(
+def _on_pg_error(msg: str):
+    if 'error' in msg:
+        raise ValueError(msg)
+
+
+def pg_dump(
         database: str,
         schemas: list[str],
         dump_path: str,
+        options: list[str] | None = None
 ):
     _schemas = '|'.join(x for x in schemas)
     cmd = [
         'pg_dump',
-        '--schema-only',
         '-n', f"'({_schemas})'",
-        '-Fc', database,
-        '>', dump_path
+        '-d', database
     ]
 
-    exec_cmd(cmd, env=get_pg_envs())
+    if options:
+        cmd += options
+
+    cmd += ['>', dump_path]
+
+    exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_pg_error)
 
 
-def restore_db(
+def pg_restore(
         database: str,
         dump_path: str,
 ):
@@ -97,12 +115,12 @@ def restore_db(
         'pg_restore', '-d', database,
         dump_path
     ]
-    exec_cmd(cmd, env=get_pg_envs())
+    exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_pg_error)
 
 
 def create_db(database: str):
     cmd = ['createdb', database]
-    exec_cmd(cmd, env=get_pg_envs())
+    exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_pg_error)
 
 
 def drop_db(database: str, if_exists: bool = True):
@@ -110,17 +128,21 @@ def drop_db(database: str, if_exists: bool = True):
     if if_exists:
         cmd.append('--if-exists')
     cmd.append(database)
-    exec_cmd(cmd, env=get_pg_envs())
+    exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_pg_error)
 
 
 def exec_psql_file(database: str, sql_file: str):
     cmd = ['psql', '-f', sql_file, '-d', database]
-    exec_cmd(cmd, env=get_pg_envs())
+    exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_pg_error)
 
 
 def exec_psql(database: str, query: str):
     cmd = ['psql', '-c', f"'{query}'", '-d', database]
-    exec_cmd(cmd, env=get_pg_envs())
+    exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_pg_error)
+
+
+async def exec_file(conn: asyncpg.Connection, file: Path):
+    await conn.execute(file.read_text())
 
 
 async def iterate_pg(conn: asyncpg.Connection,
@@ -171,15 +193,16 @@ async def check_tmp_table_exists(conn: asyncpg.Connection, table: str) -> bool:
 async def insert_many(conn: asyncpg.Connection,
                       table: str,
                       data: list[dict]):
+    """
+    Keys in dict must have the same order
+    """
     keys = tuple(data[0].keys())
     fields = ', '.join(f'"{k}"' for k in keys)
     values = ', '.join(f'${i + 1}' for i, _ in enumerate(keys))
     query = f'INSERT INTO {table} ({fields}) VALUES ({values})'
-    _data = [tuple(x) for x in data]
+    _data = [tuple(x.values()) for x in data]
     await conn.executemany(query, _data)
 
-
-from typing import TypeVar
 
 X = TypeVar('X')
 

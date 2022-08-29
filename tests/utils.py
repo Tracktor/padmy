@@ -1,5 +1,6 @@
 import pprint
 from dataclasses import asdict
+from pathlib import Path
 
 import deepdiff
 from psycopg2.extensions import connection
@@ -64,3 +65,46 @@ def insert_many(table, data, conn, **kwargs):
     with conn.cursor() as cur:
         _ = cur.executemany(query, _data)
     return conn.commit()
+
+
+_TABLE_EXISTS_QUERY = """
+SELECT EXISTS (
+   SELECT FROM information_schema.tables 
+   WHERE  table_schema = %s
+   AND    table_name   = %s
+   )
+"""
+
+
+def check_table_exists(engine: connection, schema: str, table: str):
+    with engine.cursor() as c:
+        c.execute(_TABLE_EXISTS_QUERY, (schema, table))
+        res = c.fetchone()
+    return res[0] if res else None
+
+
+_COLUMN_EXISTS_QUERY = """
+SELECT EXISTS (
+    SELECT
+    FROM information_schema.columns 
+    WHERE table_schema  = %s 
+    AND table_name = %s 
+    AND column_name = %s
+)
+"""
+
+
+def check_column_exists(engine: connection, schema: str,
+                        table: str, column: str):
+    with engine.cursor() as c:
+        c.execute(_COLUMN_EXISTS_QUERY, (schema, table, column))
+        res = c.fetchone()
+    return res[0] if res else None
+
+
+
+def compare_files(f1: Path, f2: Path):
+    def get_lines(f: Path):
+        return [x.strip() for x in f.read_text().split('\n') if x.strip()]
+
+    return get_lines(f1) == get_lines(f2)
