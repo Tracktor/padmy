@@ -1,5 +1,4 @@
 import logging
-import pathlib
 import re
 
 import pytest
@@ -65,11 +64,9 @@ def test_migrate_setup(engine, loop, aengine):
 
 
 @pytest.mark.usefixtures('setup_test_schema')
-def test_migrate_verify_valid(monkeypatch, engine):
+def test_migrate_verify_valid(monkeypatch, engine, tmp_path):
     from padmy.migration import migrate_verify
     from padmy.migration.migration import MigrationError
-
-    tmp_path = pathlib.Path('/tmp/test')
 
     migrate_verify(database=PG_DATABASE,
                    schemas=['general'],
@@ -79,9 +76,9 @@ def test_migrate_verify_valid(monkeypatch, engine):
 
     try:
         migrate_verify(database=PG_DATABASE,
-                   schemas=['general'],
-                   dump_dir=tmp_path,
-                   migration_folder=VALID_MIGRATIONS_DIR)
+                       schemas=['general'],
+                       dump_dir=tmp_path,
+                       migration_folder=VALID_MIGRATIONS_DIR)
     except MigrationError as e:
         print(e.diff)
         raise e
