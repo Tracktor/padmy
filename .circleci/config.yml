@@ -37,7 +37,8 @@ jobs:
       - checkout
       - run:
           name: Installing psql
-          command: sudo apt-get update && sudo apt-get install postgresql
+          # Version should match the PG image
+          command: sudo apt-get update && sudo apt-get install postgresql-13
       - sre/run-python-tests:
           extras: '-E network'
           before-steps:
