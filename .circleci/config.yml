@@ -155,6 +155,7 @@ jobs:
           at: .
       - sre/load-poetry-version
       - sre/build-docker:
+          dockerfile: './docker/pg-13/Dockerfile'
           image_name: 'tracktor/padmy'
           version: ${VERSION}-13
           latest_version: 'latest-13'
@@ -172,6 +173,7 @@ jobs:
           at: .
       - sre/load-poetry-version
       - sre/build-docker:
+          dockerfile: './docker/pg-13/Dockerfile'
           image_name: 'tracktor/padmy'
           version: ${VERSION}-network-13
           latest_version: 'latest-network-13'
@@ -189,6 +191,7 @@ jobs:
           at: .
       - sre/load-poetry-version
       - sre/build-docker:
+          dockerfile: './docker/pg-14/Dockerfile'
           image_name: 'tracktor/padmy'
           version: ${VERSION}-14
           latest_version: 'latest-14'
@@ -206,6 +209,7 @@ jobs:
           at: .
       - sre/load-poetry-version
       - sre/build-docker:
+          dockerfile: './docker/pg-14/Dockerfile'
           image_name: 'tracktor/padmy'
           version: ${VERSION}-network-14
           latest_version: 'latest-network-14'
