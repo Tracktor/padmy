@@ -75,7 +75,7 @@ jobs:
 
   # Build
 
-  build-docker:
+  build-docker-13:
     executor: build-docker
     steps:
       - setup_remote_docker:
@@ -85,13 +85,14 @@ jobs:
           at: .
       - sre/load-poetry-version
       - sre/build-docker:
+          dockerfile: './docker/pg-13/Dockerfile'
           image_name: 'tracktor/padmy'
-          version: "${VERSION}"
-          latest_version: 'latest'
+          version: ${VERSION}-13
+          latest_version: 'latest-13'
           registry_pwd: $CONTAINER_REGISTRY_PWD
           registry_user: $CONTAINER_REGISTRY_USER
 
-  build-docker-network:
+  build-docker-network-13:
     executor: build-docker
     steps:
       - setup_remote_docker:
@@ -101,16 +102,50 @@ jobs:
           at: .
       - sre/load-poetry-version
       - sre/build-docker:
+          dockerfile: './docker/pg-13/Dockerfile'
           image_name: 'tracktor/padmy'
-          version: "${VERSION}-network"
-          latest_version: 'latest-network'
+          version: ${VERSION}-network-13
+          latest_version: 'latest-network-13'
+          registry_pwd: $CONTAINER_REGISTRY_PWD
+          registry_user: $CONTAINER_REGISTRY_USER
+
+  build-docker-14:
+    executor: build-docker
+    steps:
+      - setup_remote_docker:
+          version: 20.10.14
+      - checkout
+      - attach_workspace:
+          at: .
+      - sre/load-poetry-version
+      - sre/build-docker:
+          dockerfile: './docker/pg-14/Dockerfile'
+          image_name: 'tracktor/padmy'
+          version: ${VERSION}-14
+          latest_version: 'latest-14'
+          registry_pwd: $CONTAINER_REGISTRY_PWD
+          registry_user: $CONTAINER_REGISTRY_USER
+
+  build-docker-network-14:
+    executor: build-docker
+    steps:
+      - setup_remote_docker:
+          version: 20.10.14
+      - checkout
+      - attach_workspace:
+          at: .
+      - sre/load-poetry-version
+      - sre/build-docker:
+          dockerfile: './docker/pg-14/Dockerfile'
+          image_name: 'tracktor/padmy'
+          version: ${VERSION}-network-14
+          latest_version: 'latest-network-14'
           registry_pwd: $CONTAINER_REGISTRY_PWD
           registry_user: $CONTAINER_REGISTRY_USER
 
   # Publish
 
-
-  build-publish-docker:
+  build-publish-docker-13:
     executor: build-docker
     steps:
       - setup_remote_docker:
@@ -121,13 +156,13 @@ jobs:
       - sre/load-poetry-version
       - sre/build-docker:
           image_name: 'tracktor/padmy'
-          version: ${VERSION}
-          latest_version: 'latest'
+          version: ${VERSION}-13
+          latest_version: 'latest-13'
           publish: true
           registry_pwd: $CONTAINER_REGISTRY_PWD
           registry_user: $CONTAINER_REGISTRY_USER
 
-  build-publish-docker-network:
+  build-publish-docker-network-13:
     executor: build-docker
     steps:
       - setup_remote_docker:
@@ -138,8 +173,42 @@ jobs:
       - sre/load-poetry-version
       - sre/build-docker:
           image_name: 'tracktor/padmy'
-          version: ${VERSION}-network
-          latest_version: 'latest-network'
+          version: ${VERSION}-network-13
+          latest_version: 'latest-network-13'
+          publish: true
+          registry_pwd: $CONTAINER_REGISTRY_PWD
+          registry_user: $CONTAINER_REGISTRY_USER
+
+  build-publish-docker-14:
+    executor: build-docker
+    steps:
+      - setup_remote_docker:
+          version: 20.10.14
+      - checkout
+      - attach_workspace:
+          at: .
+      - sre/load-poetry-version
+      - sre/build-docker:
+          image_name: 'tracktor/padmy'
+          version: ${VERSION}-14
+          latest_version: 'latest-14'
+          publish: true
+          registry_pwd: $CONTAINER_REGISTRY_PWD
+          registry_user: $CONTAINER_REGISTRY_USER
+
+  build-publish-docker-network-14:
+    executor: build-docker
+    steps:
+      - setup_remote_docker:
+          version: 20.10.14
+      - checkout
+      - attach_workspace:
+          at: .
+      - sre/load-poetry-version
+      - sre/build-docker:
+          image_name: 'tracktor/padmy'
+          version: ${VERSION}-network-14
+          latest_version: 'latest-network-14'
           publish: true
           registry_pwd: $CONTAINER_REGISTRY_PWD
           registry_user: $CONTAINER_REGISTRY_USER
@@ -163,13 +232,26 @@ workflows:
       - run-tests
       - export-requirements
       - export-requirements-network
-      - build-docker:
+      - build-docker-13:
           requires: [
             run-tests,
             export-requirements
           ]
           context: *staging_context
-      - build-docker-network:
+      - build-docker-network-13:
+          requires: [
+            run-tests,
+            export-requirements-network
+          ]
+          context: *staging_context
+
+      - build-docker-14:
+          requires: [
+            run-tests,
+            export-requirements
+          ]
+          context: *staging_context
+      - build-docker-network-14:
           requires: [
             run-tests,
             export-requirements-network
@@ -185,13 +267,25 @@ workflows:
       - run-tests
       - export-requirements
       - export-requirements-network
-      - build-publish-docker:
+      - build-publish-docker-13:
           requires: [
             run-tests,
             export-requirements
           ]
           context: *production_context
-      - build-publish-docker-network:
+      - build-publish-docker-network-13:
+          requires: [
+            run-tests,
+            export-requirements-network
+          ]
+          context: *production_context
+      - build-publish-docker-14:
+          requires: [
+            run-tests,
+            export-requirements
+          ]
+          context: *production_context
+      - build-publish-docker-network-14:
           requires: [
             run-tests,
             export-requirements-network
