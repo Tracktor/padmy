@@ -1,7 +1,7 @@
 import subprocess
 from importlib import reload
 from pathlib import Path
-from typing import Sequence, AsyncIterator, Callable, TypeVar
+from typing import Sequence, AsyncIterator, Callable, TypeVar, cast
 
 import asyncpg
 from piou import Option, Derived, Password
@@ -148,19 +148,20 @@ async def exec_file(conn: asyncpg.Connection, file: Path):
 async def iterate_pg(conn: asyncpg.Connection,
                      query: str,
                      *args,
-                     chunk_size: int = 500) -> AsyncIterator[list[dict]]:
+                     from_offset: int = 0,
+                     chunk_size: int = 500,
+                     timeout: int | None = None) -> AsyncIterator[list[asyncpg.Record]]:
     async with conn.transaction():
-        cur = await conn.cursor(query, *args)
-        while True:
-            data = await cur.fetch(chunk_size)
-            if not data:
-                break
-            yield data
+        cur: asyncpg.connection.cursor.Cursor = await conn.cursor(query, *args)
+        if from_offset:
+            await cur.forward(from_offset, timeout=timeout)
+        while data := await cur.fetch(chunk_size, timeout=timeout):
+            yield cast(list[asyncpg.Record], data)
 
 
 _EXT_EXISTS_QUERY = """
-select exists(
-    select FROM pg_extension where extname = $1
+SELECT EXISTS(
+    SELECT FROM pg_extension WHERE extname = $1
 )
 """
 
@@ -177,7 +178,7 @@ _TMP_TABLE_EXISTS_QUERY = """
     SELECT EXISTS (
         SELECT 
         FROM   information_schema.tables 
-        WHERE  table_schema like 'pg_temp_%'
+        WHERE  table_schema LIKE 'pg_temp_%'
         AND table_name = $1
     )
 """

@@ -54,4 +54,4 @@ def create_new_migration(folder: Path):
     up_file.write_text(file_header)
     down_file.write_text(file_header)
 
-    _CONSOLE.print(f'\nNew files created!\n')
+    _CONSOLE.print('\nNew files created!\n')

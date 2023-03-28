@@ -293,11 +293,11 @@ def pprint_compared_dbs(db_1: Database, db_2: Database):
     for _table1, _table2 in zip(tables_1, tables_2):
         perc_diff = 100 if _table2.count == 0 else int(_table2.count * 100 / _table1.count)
         if perc_diff > 0:
-            perc_sign = '+'
+            pass
         elif perc_diff < 0:
-            perc_sign = '-'
+            pass
         else:
-            perc_sign = ''
+            pass
         table.add_row(_table1.full_name,
                       str(_table1.count),
                       str(_table2.count),

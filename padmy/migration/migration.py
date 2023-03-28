@@ -14,9 +14,9 @@ from .utils import get_files, iter_migration_files, MigrationFile
 
 _GET_LATEST_COMMIT_QUERY = """
 SELECT file_ts, file_name
-from public.migration
-order by applied_at desc 
-limit 1
+FROM public.migration
+ORDER BY applied_at DESC, file_ts DESC
+LIMIT 1
 """
 
 # PG_GLOBAL_DUMP_DIR = GLOBAL_TMP / 'matching-pg-backup' / 'dump'

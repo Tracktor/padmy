@@ -2,7 +2,7 @@ import textwrap
 
 import pytest
 
-from .utils import fetch_all, exec_req, insert_many
+from .utils import fetch_all, insert_many, exec_req
 
 
 @pytest.mark.parametrize('table,pks,fields,field_types,expected', [

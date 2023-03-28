@@ -2,6 +2,7 @@ import contextlib
 import logging
 import tempfile
 from math import floor
+from typing import cast
 
 import asyncpg
 
@@ -103,7 +104,7 @@ async def _insert_node_table(conn: asyncpg.Connection,
         logs.debug(query)
         await conn.execute(query)
 
-    count: int | None = await conn.fetchval(f'SELECT count(*) from {table.tmp_name}')
+    count = cast(int | None, await conn.fetchval(f'SELECT count(*) from {table.tmp_name}'))
     if count is None:
         raise NotImplementedError('Got empty table')
 

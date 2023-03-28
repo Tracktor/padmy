@@ -6,7 +6,6 @@ from .network import convert_db
 from ..logs import logs
 
 try:
-    from dash import Dash, html
     import dash_cytoscape as cyto
 except ImportError:
     logs.error('Both dash and dash_cytoscape need to be installed')

@@ -1,7 +1,6 @@
 import asyncio
 import os
 from pathlib import Path
-from typing import Iterator
 
 import asyncpg
 import psycopg2

@@ -1,6 +1,7 @@
 version: 2.1
 
 orbs:
+  gh: circleci/github-cli@1.0
   sre: tracktor/ci-tools@0.1.5
 
 references:
@@ -8,6 +9,10 @@ references:
     - docker
   production_context: &production_context
     - docker
+    - github
+  pypi_context: &pypi_context
+    - pypi
+    - github
 
 executors:
 
@@ -15,7 +20,7 @@ executors:
     docker:
       - image: cimg/base:current
 
-  export-poetry:
+  build-wheel:
     docker:
       - image: cimg/python:3.10
 
@@ -25,7 +30,6 @@ executors:
       - image: cimg/postgres:13.6
         environment:
           POSTGRES_PASSWORD: postgres
-
 
 jobs:
 
@@ -60,14 +64,14 @@ jobs:
   # Docker Images
 
   export-requirements:
-    executor: export-poetry
+    executor: build-wheel
     steps:
       - checkout
       - sre/export-poetry:
           extras: '--without-hashes'
 
   export-requirements-network:
-    executor: export-poetry
+    executor: build-wheel
     steps:
       - checkout
       - sre/export-poetry:
@@ -217,50 +221,53 @@ jobs:
           registry_pwd: $CONTAINER_REGISTRY_PWD
           registry_user: $CONTAINER_REGISTRY_USER
 
+  # Bump
+
+  bump-version:
+    executor: build-wheel
+    steps:
+      - gh/setup
+      - checkout
+      - restore_cache:
+          keys:
+            - deps-{{ checksum "poetry.lock" }}
+      - run:
+          name: Adding github.com to known hosts
+          command: |
+            mkdir -p ~/.ssh
+            ssh-keyscan github.com >> ~/.ssh/known_hosts
+      - run:
+          name: Create release
+          command: bash .circleci/scripts/release.sh
+      - store_artifacts:
+          path: dist
+      - save_cache:
+          name: Saving wheel
+          key: padmy-{{ checksum "pyproject.toml" }}
+          paths:
+            - dist/
+  publish:
+    executor: build-wheel
+    steps:
+      - checkout
+      - restore_cache:
+          name: Restore wheel
+          keys:
+            - padmy-{{ checksum "pyproject.toml" }}
+      - run:
+          name: Publishing
+          command: poetry publish -u __token__ -p $PYPI_TOKEN
+
+
 workflows:
 
-  features:
+  run-tests:
     when:
       matches:
-        pattern: "^(feat|feature)\\/.*$"
+        pattern: "^(feat|feature|fix)\\/.*$"
         value: << pipeline.git.branch >>
     jobs:
       - run-tests
-
-  dev:
-    when:
-      matches:
-        pattern: "^develop$"
-        value: << pipeline.git.branch >>
-    jobs:
-      - run-tests
-      - export-requirements
-      - export-requirements-network
-      - build-docker-13:
-          requires: [
-            run-tests,
-            export-requirements
-          ]
-          context: *staging_context
-      - build-docker-network-13:
-          requires: [
-            run-tests,
-            export-requirements-network
-          ]
-          context: *staging_context
-
-      - build-docker-14:
-          requires: [
-            run-tests,
-            export-requirements
-          ]
-          context: *staging_context
-      - build-docker-network-14:
-          requires: [
-            run-tests,
-            export-requirements-network
-          ]
-          context: *staging_context
 
   production:
     when:
@@ -295,3 +302,16 @@ workflows:
             export-requirements-network
           ]
           context: *production_context
+      - bump-version:
+          context: *production_context
+          requires: [ run-tests ]
+
+  publish:
+    jobs:
+      - publish:
+          context: *pypi_context
+          filters:
+            tags:
+              only: /.*/
+            branches:
+              ignore: /.*/

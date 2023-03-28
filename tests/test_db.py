@@ -1,6 +1,6 @@
 import pytest
 
-from .utils import exec_req, pprint_dataclass_diff
+from .utils import pprint_dataclass_diff, exec_req
 
 
 @pytest.fixture()
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS tmp_test.table_1
 CREATE TABLE IF NOT EXISTS tmp_test.table_2
 (
     id           SERIAL PRIMARY KEY,
-    table_1_id   int references tmp_test.table_1
+    table_1_id   INT REFERENCES tmp_test.table_1
 );
 """
 
@@ -49,14 +49,14 @@ CREATE TABLE IF NOT EXISTS tmp_test.table_1
 CREATE TABLE IF NOT EXISTS tmp_test.table_2
 (
     id           SERIAL PRIMARY KEY,
-    table_1_id   int references tmp_test.table_1
+    table_1_id   INT REFERENCES tmp_test.table_1
 );
 
 CREATE TABLE IF NOT EXISTS tmp_test.table_3
 (
     id           SERIAL PRIMARY KEY,
-    table_1_id   int references tmp_test.table_1,
-    table_2_id   int references tmp_test.table_2
+    table_1_id   INT REFERENCES tmp_test.table_1,
+    table_2_id   INT REFERENCES tmp_test.table_2
 );
 """
 

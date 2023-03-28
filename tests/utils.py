@@ -59,7 +59,7 @@ def pprint_dataclass_diff(d1, d2):
 def insert_many(table, data, conn, **kwargs):
     keys = tuple(data[0].keys())
     fields = ', '.join(f'{k}' for k in keys)
-    values = ', '.join(f'%s' for _ in keys)
+    values = ', '.join('%s' for _ in keys)
     query = f'INSERT INTO {table} ({fields}) VALUES ({values})'
     _data = [tuple(x.values()) for x in data]
     with conn.cursor() as cur:
