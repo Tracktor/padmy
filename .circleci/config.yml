@@ -23,6 +23,7 @@ executors:
   build-wheel:
     docker:
       - image: cimg/python:3.10.8
+
   tests:
     docker:
       - image: cimg/python:3.10.8
@@ -245,6 +246,7 @@ jobs:
           key: padmy-{{ checksum "pyproject.toml" }}
           paths:
             - dist/
+
   publish:
     executor: build-wheel
     steps:
