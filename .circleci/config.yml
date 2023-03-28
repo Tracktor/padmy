@@ -22,8 +22,7 @@ executors:
 
   build-wheel:
     docker:
-      - image: cimg/python:3.10
-
+      - image: cimg/python:3.10.8
   tests:
     docker:
       - image: cimg/python:3.10
