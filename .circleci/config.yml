@@ -48,7 +48,7 @@ jobs:
             wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
             sudo apt-get update && sudo apt-get install postgresql-client-13
       - sre/run-python-tests:
-          extras: '-E network'
+          extras: '--all-extras'
           before-steps:
             - run:
                 name: Initializing DB
