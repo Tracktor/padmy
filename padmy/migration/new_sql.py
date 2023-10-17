@@ -24,13 +24,13 @@ def create_sql_file(sql_dir: Path, position: int):
         0005_file5.sql
     """
     is_before = True
-    sql_files = sorted(sql_dir.glob('*.sql'))
+    sql_files = sorted(sql_dir.glob("*.sql"))
     for _file in sql_files:
-        _curr_pos, *_file_name = _file.name.split('_')
-        _curr_pos, _file_name = int(_curr_pos), '_'.join(_file_name)
+        _curr_pos, *_file_name = _file.name.split("_")
+        _curr_pos, _file_name = int(_curr_pos), "_".join(_file_name)
         if _curr_pos == position:
             is_before = False
         if not is_before:
-            _file.rename(f'{sql_dir}/{_curr_pos + 1:04}_{_file_name}')
+            _file.rename(f"{sql_dir}/{_curr_pos + 1:04}_{_file_name}")
 
-    os.close(os.open(f'{sql_dir}/{position:04}_new_file.sql', os.O_CREAT))
+    os.close(os.open(f"{sql_dir}/{position:04}_new_file.sql", os.O_CREAT))

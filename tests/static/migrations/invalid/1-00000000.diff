@@ -36,7 +36,7 @@
 +    CACHE 1;
 +
 +
-+ALTER TABLE general.test2_id_seq OWNER TO postgres;
++ALTER SEQUENCE general.test2_id_seq OWNER TO postgres;
 +
 +--
 +-- Name: test2_id_seq; Type: SEQUENCE OWNED BY; Schema: general; Owner: postgres

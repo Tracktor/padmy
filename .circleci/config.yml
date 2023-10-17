@@ -22,12 +22,14 @@ executors:
 
   build-wheel:
     docker:
-      - image: cimg/python:3.10.8
+      - image: cimg/python:3.10.12-node
 
   tests:
     docker:
-      - image: cimg/python:3.10.8
-      - image: cimg/postgres:13.6
+      - image: cimg/python:3.10.12-node
+        environment:
+          PYRIGHT_PYTHON_GLOBAL_NODE: true
+      - image: cimg/postgres:14.9-postgis
         environment:
           POSTGRES_PASSWORD: postgres
 
@@ -47,9 +49,9 @@ jobs:
             sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
             # Import the repository signing key:
             wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
-            sudo apt-get update && sudo apt-get install postgresql-client-13
+            sudo apt-get update && sudo apt-get install postgresql-client-14
       - sre/run-python-tests:
-          extras: '--all-extras'
+          extras: '--all-extras --quiet'
           before-steps:
             - run:
                 name: Initializing DB
@@ -78,41 +80,6 @@ jobs:
           extras: '--without-hashes -E network'
 
   # Build
-
-  build-docker-13:
-    executor: build-docker
-    steps:
-      - setup_remote_docker:
-          version: 20.10.14
-      - checkout
-      - attach_workspace:
-          at: .
-      - sre/load-poetry-version
-      - sre/build-docker:
-          dockerfile: './docker/pg-13/Dockerfile'
-          image_name: 'tracktor/padmy'
-          version: ${VERSION}-13
-          latest_version: 'latest-13'
-          registry_pwd: $CONTAINER_REGISTRY_PWD
-          registry_user: $CONTAINER_REGISTRY_USER
-
-  build-docker-network-13:
-    executor: build-docker
-    steps:
-      - setup_remote_docker:
-          version: 20.10.14
-      - checkout
-      - attach_workspace:
-          at: .
-      - sre/load-poetry-version
-      - sre/build-docker:
-          dockerfile: './docker/pg-13/Dockerfile'
-          image_name: 'tracktor/padmy'
-          version: ${VERSION}-network-13
-          latest_version: 'latest-network-13'
-          registry_pwd: $CONTAINER_REGISTRY_PWD
-          registry_user: $CONTAINER_REGISTRY_USER
-
   build-docker-14:
     executor: build-docker
     steps:
@@ -148,42 +115,6 @@ jobs:
           registry_user: $CONTAINER_REGISTRY_USER
 
   # Publish
-
-  build-publish-docker-13:
-    executor: build-docker
-    steps:
-      - setup_remote_docker:
-          version: 20.10.14
-      - checkout
-      - attach_workspace:
-          at: .
-      - sre/load-poetry-version
-      - sre/build-docker:
-          dockerfile: './docker/pg-13/Dockerfile'
-          image_name: 'tracktor/padmy'
-          version: ${VERSION}-13
-          latest_version: 'latest-13'
-          publish: true
-          registry_pwd: $CONTAINER_REGISTRY_PWD
-          registry_user: $CONTAINER_REGISTRY_USER
-
-  build-publish-docker-network-13:
-    executor: build-docker
-    steps:
-      - setup_remote_docker:
-          version: 20.10.14
-      - checkout
-      - attach_workspace:
-          at: .
-      - sre/load-poetry-version
-      - sre/build-docker:
-          dockerfile: './docker/pg-13/Dockerfile'
-          image_name: 'tracktor/padmy'
-          version: ${VERSION}-network-13
-          latest_version: 'latest-network-13'
-          publish: true
-          registry_pwd: $CONTAINER_REGISTRY_PWD
-          registry_user: $CONTAINER_REGISTRY_USER
 
   build-publish-docker-14:
     executor: build-docker
@@ -279,18 +210,6 @@ workflows:
       - run-tests
       - export-requirements
       - export-requirements-network
-      - build-publish-docker-13:
-          requires: [
-            run-tests,
-            export-requirements
-          ]
-          context: *production_context
-      - build-publish-docker-network-13:
-          requires: [
-            run-tests,
-            export-requirements-network
-          ]
-          context: *production_context
       - build-publish-docker-14:
           requires: [
             run-tests,

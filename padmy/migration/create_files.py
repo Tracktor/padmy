@@ -15,13 +15,12 @@ _CONSOLE = Console(markup=True, highlight=False)
 
 def _get_user_email() -> str | None:
     default_author = get_git_email()
-    author = Prompt.ask("[blue]Author[/blue]", default=default_author,
-                        console=_CONSOLE)
+    author = Prompt.ask("[blue]Author[/blue]", default=default_author, console=_CONSOLE)
     return author
 
 
 def _get_last_migration_name(folder: Path) -> str | None:
-    """ Returns the most recent migration files"""
+    """Returns the most recent migration files"""
     files = get_files(reverse=True, folder=folder)
     if not files:
         return None
@@ -35,23 +34,27 @@ def create_new_migration(folder: Path):
     """
     folder.mkdir(exist_ok=True, parents=True)
 
-    _base_name = f'{int(time.time())}-{str(uuid.uuid4())[:8]}'
-    _CONSOLE.print(f'\nCreating new migration file ([green]{escape(_base_name)}[/green]):\n')
+    _base_name = f"{int(time.time())}-{str(uuid.uuid4())[:8]}"
+    _CONSOLE.print(
+        f"\nCreating new migration file ([green]{escape(_base_name)}[/green]):\n"
+    )
 
     last_migration = _get_last_migration_name(folder)
-    logs.debug(f'Last migration files: {last_migration}')
+    logs.debug(f"Last migration files: {last_migration}")
     author = _get_user_email()
-    logs.debug(f'User email: {author}')
+    logs.debug(f"User email: {author}")
 
-    up_file = folder / Path(f'{_base_name}-up.sql')
-    down_file = folder / Path(f'{_base_name}-down.sql')
+    up_file = folder / Path(f"{_base_name}-up.sql")
+    down_file = folder / Path(f"{_base_name}-down.sql")
 
-    file_header = textwrap.dedent(f"""
+    file_header = textwrap.dedent(
+        f"""
     -- Prev-file: {last_migration or ''}
     -- Author: {author or ''}
-    """).strip()
+    """
+    ).strip()
 
     up_file.write_text(file_header)
     down_file.write_text(file_header)
 
-    _CONSOLE.print('\nNew files created!\n')
+    _CONSOLE.print("\nNew files created!\n")

@@ -1,24 +1,26 @@
 import pytest
 
-from .utils import pprint_dataclass_diff, exec_req
+from .utils import pprint_dataclass_diff
 
 
 @pytest.fixture()
 def setup_tmp_schema(engine):
-    exec_req(engine, 'DROP SCHEMA IF EXISTS tmp_test CASCADE')
-    exec_req(engine, 'CREATE SCHEMA tmp_test')
+    for schema in ["cschema", "cschema2"]:
+        engine.execute(f"DROP SCHEMA IF EXISTS {schema} CASCADE")
+        engine.execute(f"CREATE SCHEMA {schema}")
+    engine.commit()
     yield
-    exec_req(engine, 'DROP SCHEMA tmp_test CASCADE')
+    # exec_req(engine, 'DROP SCHEMA cschema CASCADE')
 
 
 NO_CONSTRAINTS_QUERY = """
-CREATE TABLE IF NOT EXISTS tmp_test.table_1
+CREATE TABLE IF NOT EXISTS cschema.table_1
 (
     id  SERIAL PRIMARY KEY,
     foo TEXT
 );
 
-CREATE TABLE IF NOT EXISTS tmp_test.table_2
+CREATE TABLE IF NOT EXISTS cschema.table_2
 (
     id           SERIAL PRIMARY KEY,
     bar   TEXT
@@ -26,77 +28,135 @@ CREATE TABLE IF NOT EXISTS tmp_test.table_2
 """
 
 ONE_CONSTRAINT_QUERY = """
-CREATE TABLE IF NOT EXISTS tmp_test.table_1
+CREATE TABLE IF NOT EXISTS cschema.table_1
 (
     id  SERIAL PRIMARY KEY,
     foo TEXT
 );
 
-CREATE TABLE IF NOT EXISTS tmp_test.table_2
+CREATE TABLE IF NOT EXISTS cschema.table_2
 (
     id           SERIAL PRIMARY KEY,
-    table_1_id   INT REFERENCES tmp_test.table_1
+    table_1_id   INT REFERENCES cschema.table_1
 );
 """
 
 MULTIPLE_CONSTRAINTS_QUERY = """
-CREATE TABLE IF NOT EXISTS tmp_test.table_1
+CREATE TABLE IF NOT EXISTS cschema.table_1
 (
     id  SERIAL PRIMARY KEY,
     foo TEXT
 );
 
-CREATE TABLE IF NOT EXISTS tmp_test.table_2
+CREATE TABLE IF NOT EXISTS cschema.table_2
 (
     id           SERIAL PRIMARY KEY,
-    table_1_id   INT REFERENCES tmp_test.table_1
+    table_1_id   INT REFERENCES cschema.table_1
 );
 
-CREATE TABLE IF NOT EXISTS tmp_test.table_3
+CREATE TABLE IF NOT EXISTS cschema.table_3
 (
     id           SERIAL PRIMARY KEY,
-    table_1_id   INT REFERENCES tmp_test.table_1,
-    table_2_id   INT REFERENCES tmp_test.table_2
+    table_1_id   INT REFERENCES cschema.table_1,
+    table_2_id   INT REFERENCES cschema.table_2
+);
+"""
+
+MULTIPLE_SCHEMA_QUERY = """
+CREATE TABLE IF NOT EXISTS cschema.table_1
+(
+    id  SERIAL PRIMARY KEY,
+    foo TEXT
+);
+
+CREATE TABLE IF NOT EXISTS cschema2.table_1
+(
+    id           SERIAL PRIMARY KEY,
+    table_1_id   INT REFERENCES cschema.table_1
 );
 """
 
 DEFAULT = {
-    'schema': 'tmp_test',
-    'foreign_schema': 'tmp_test',
-    'foreign_column_name': 'id',
-    'column_name': 'table_1_id'
+    "schema": "cschema",
+    "foreign_schema": "cschema",
+    "foreign_column_name": "id",
+    "column_name": "table_1_id",
 }
 
 _FKS_PARAMS = [
-    ('No table', None, []),
-    ('No constraints', NO_CONSTRAINTS_QUERY, []),
-    ('One constraint', ONE_CONSTRAINT_QUERY, [
-        {**DEFAULT, 'table': 'table_2', 'foreign_table': 'table_1', 'constraint_name': 'table_2_table_1_id_fkey'}
-    ]),
-    ('Multiple constraints', MULTIPLE_CONSTRAINTS_QUERY, [
-        {**DEFAULT, 'table': 'table_2', 'foreign_table': 'table_1', 'constraint_name': 'table_2_table_1_id_fkey'},
-        {**DEFAULT, 'table': 'table_3', 'foreign_table': 'table_1', 'constraint_name': 'table_3_table_1_id_fkey'},
-        {**DEFAULT, 'table': 'table_3', 'foreign_table': 'table_2', 'constraint_name': 'table_3_table_2_id_fkey',
-         'column_name': 'table_2_id'}
-    ])
-
+    ("No table", None, []),
+    ("No constraints", NO_CONSTRAINTS_QUERY, []),
+    (
+        "One constraint",
+        ONE_CONSTRAINT_QUERY,
+        [
+            {
+                **DEFAULT,
+                "table": "table_2",
+                "foreign_table": "table_1",
+                "constraint_name": "table_2_table_1_id_fkey",
+            }
+        ],
+    ),
+    (
+        "Multiple constraints",
+        MULTIPLE_CONSTRAINTS_QUERY,
+        [
+            {
+                **DEFAULT,
+                "table": "table_2",
+                "foreign_table": "table_1",
+                "constraint_name": "table_2_table_1_id_fkey",
+            },
+            {
+                **DEFAULT,
+                "table": "table_3",
+                "foreign_table": "table_1",
+                "constraint_name": "table_3_table_1_id_fkey",
+            },
+            {
+                **DEFAULT,
+                "table": "table_3",
+                "foreign_table": "table_2",
+                "constraint_name": "table_3_table_2_id_fkey",
+                "column_name": "table_2_id",
+            },
+        ],
+    ),
+    (
+        "Multiple schemas",
+        MULTIPLE_SCHEMA_QUERY,
+        [
+            {
+                **DEFAULT,
+                "schema": "cschema2",
+                "table": "table_1",
+                "foreign_table": "table_1",
+                "constraint_name": "table_1_table_1_id_fkey",
+            }
+        ],
+    ),
 ]
 
 
-@pytest.mark.usefixtures('setup_tmp_schema')
-@pytest.mark.parametrize('name, query, expected', _FKS_PARAMS, ids=[x[0] for x in _FKS_PARAMS])
+@pytest.mark.usefixtures("setup_tmp_schema")
+@pytest.mark.parametrize(
+    "name, query, expected", _FKS_PARAMS, ids=[x[0] for x in _FKS_PARAMS]
+)
 def test_load_fk_constraints(name, query, expected, aengine, engine, loop):
     from padmy.db import FKConstraint, load_foreign_keys
-    if query:
-        exec_req(engine, query)
 
-    fks = loop.run_until_complete(load_foreign_keys(aengine, ['tmp_test']))
+    if query:
+        engine.execute(query)
+        engine.commit()
+
+    fks = loop.run_until_complete(load_foreign_keys(aengine, ["cschema", "cschema2"]))
     expected_fks = [FKConstraint(**x) for x in expected]
     assert fks == expected_fks, pprint_dataclass_diff(fks, expected_fks)
 
 
 ONE_PK_TABLE = """
-CREATE TABLE IF NOT EXISTS tmp_test.table_1
+CREATE TABLE IF NOT EXISTS cschema.table_1
 (
     id  SERIAL PRIMARY KEY,
     foo TEXT
@@ -104,7 +164,7 @@ CREATE TABLE IF NOT EXISTS tmp_test.table_1
 """
 
 MULTIPLE_PK_TABLE = """
-CREATE TABLE IF NOT EXISTS tmp_test.table_1
+CREATE TABLE IF NOT EXISTS cschema.table_1
 (
     id_1  INT,
     id_2  TEXT,
@@ -113,45 +173,52 @@ CREATE TABLE IF NOT EXISTS tmp_test.table_1
 );
 """
 
-DEFAULT_PK_CONSTRAINT = {
-    'table': 'table_1',
-    'schema': 'tmp_test'
-}
+DEFAULT_PK_CONSTRAINT = {"table": "table_1", "schema": "cschema"}
 
 _PKS_PARAMS = [
-    ('No table', None, []),
-    ('One Primary key', ONE_PK_TABLE, [{**DEFAULT_PK_CONSTRAINT, 'column_name': 'id'}]),
-    ('Multiple primary keys', MULTIPLE_PK_TABLE, [
-        {**DEFAULT_PK_CONSTRAINT, 'column_name': 'id_1'},
-        {**DEFAULT_PK_CONSTRAINT, 'column_name': 'id_2'}
-    ])
+    ("No table", None, []),
+    ("One Primary key", ONE_PK_TABLE, [{**DEFAULT_PK_CONSTRAINT, "column_name": "id"}]),
+    (
+        "Multiple primary keys",
+        MULTIPLE_PK_TABLE,
+        [
+            {**DEFAULT_PK_CONSTRAINT, "column_name": "id_1"},
+            {**DEFAULT_PK_CONSTRAINT, "column_name": "id_2"},
+        ],
+    ),
 ]
 
 
-@pytest.mark.usefixtures('setup_tmp_schema')
-@pytest.mark.parametrize('name, table, expected', _PKS_PARAMS,
-                         ids=[x[0] for x in _PKS_PARAMS])
+@pytest.mark.usefixtures("setup_tmp_schema")
+@pytest.mark.parametrize(
+    "name, table, expected", _PKS_PARAMS, ids=[x[0] for x in _PKS_PARAMS]
+)
 def test_load_pk_constraints(name, table, expected, aengine, engine, loop):
     from padmy.db import PKConstraint, load_primary_keys
-    if table:
-        exec_req(engine, table)
 
-    pks = loop.run_until_complete(load_primary_keys(aengine, ['tmp_test']))
+    if table:
+        engine.execute(table)
+        engine.commit()
+
+    pks = loop.run_until_complete(load_primary_keys(aengine, ["cschema"]))
     expected_pks = [PKConstraint(**x) for x in expected]
     assert pks == expected_pks, pprint_dataclass_diff(pks, expected_pks)
 
 
+@pytest.mark.usefixtures("setup_tables")
 def test_explore(loop, apool):
     from padmy.db import Database
 
-    db = Database(name='test')
+    db = Database(name="test")
 
     async def test():
-        await db.explore(apool, ['public'])
+        await db.explore(apool, ["public", "test"])
 
     loop.run_until_complete(test())
-    assert len(db.tables) == 7
-    table_1 = [x for x in db.tables if x.full_name == 'public.table_1'][0]
+
+    assert len(db.tables) == 9
+
+    table_1 = [x for x in db.tables if x.full_name == "public.table_1"][0]
     assert len(table_1.child_tables) == 2
     assert len(table_1.child_tables_safe) == 2
     assert table_1.has_children
@@ -160,20 +227,31 @@ def test_explore(loop, apool):
     assert not table_1.has_parent
     assert len(table_1.parent_tables) == 0
     assert len(table_1.parent_tables_safe) == 0
-
-    single_circular = [x for x in db.tables if x.full_name == 'public.single_circular'][0]
+    # Circular
+    single_circular = [x for x in db.tables if x.full_name == "public.single_circular"][
+        0
+    ]
 
     assert len(single_circular.child_tables) == 1
     assert len(single_circular.child_tables_safe) == 0
     assert not single_circular.has_children
+    # Schema
+    table_multi_schema_1 = [
+        x for x in db.tables if x.full_name == "public.multi_schema_1"
+    ][0]
+    assert len(table_multi_schema_1.child_tables) == 1
+    assert len(table_multi_schema_1.child_tables_safe) == 1
+    assert table_multi_schema_1.has_children
+    assert not table_multi_schema_1.children_has_been_processed
 
 
+@pytest.mark.usefixtures("setup_tables")
 def test_table_hash():
     from padmy.db import Table
 
-    t2 = Table('public', 'table_2')
-    t3 = Table('public', 'table_3')
-    t1 = Table('public', 'table_1')
+    t2 = Table("public", "table_2")
+    t3 = Table("public", "table_3")
+    t1 = Table("public", "table_1")
     t1.child_tables = {t1, t2, t3}
 
     z = {t1, t2, t3} - {t1}

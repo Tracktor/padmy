@@ -9,34 +9,34 @@ from ..conftest import STATIC_DIR
 @pytest.fixture
 def migration_dir(tmp_path):
     with tempfile.TemporaryDirectory() as tmp_dir:
-        yield Path(tmp_dir) / 'migration'
+        yield Path(tmp_dir) / "migration"
 
 
 @pytest.fixture()
 def clean_migration(engine):
     with engine.cursor() as c:
-        c.execute('DROP TABLE IF EXISTS public.migration')
+        c.execute("DROP TABLE IF EXISTS public.migration")
     engine.commit()
 
     yield
 
     with engine.cursor() as c:
-        c.execute('DROP TABLE IF EXISTS public.migration')
+        c.execute("DROP TABLE IF EXISTS public.migration")
     engine.commit()
 
 
-VALID_MIGRATIONS_DIR = STATIC_DIR / 'migrations' / 'valid'
-INVALID_MIGRATIONS_DIR = STATIC_DIR / 'migrations' / 'invalid'
+VALID_MIGRATIONS_DIR = STATIC_DIR / "migrations" / "valid"
+INVALID_MIGRATIONS_DIR = STATIC_DIR / "migrations" / "invalid"
 
 
 @pytest.fixture()
 def setup_test_schema(engine):
     with engine.cursor() as c:
-        c.execute('CREATE SCHEMA IF NOT EXISTS general')
+        c.execute("CREATE SCHEMA IF NOT EXISTS general")
     engine.commit()
 
     yield
 
     with engine.cursor() as c:
-        c.execute('DROP SCHEMA general CASCADE')
+        c.execute("DROP SCHEMA general CASCADE")
     engine.commit()
