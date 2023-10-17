@@ -163,6 +163,10 @@ jobs:
           keys:
             - deps-v0-{{ checksum "poetry.lock" }}
       - run:
+          name: Installing deps
+          command: |
+            poetry install --quiet
+      - run:
           name: Adding github.com to known hosts
           command: |
             mkdir -p ~/.ssh
