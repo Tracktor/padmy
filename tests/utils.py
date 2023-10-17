@@ -53,4 +53,4 @@ def compare_files(f1: Path, f2: Path):
     def get_lines(f: Path):
         return [x.strip() for x in f.read_text().split("\n") if x.strip()]
 
-    return get_lines(f1) == get_lines(f2)
+    assert not deepdiff.DeepDiff(get_lines(f1), get_lines(f2))

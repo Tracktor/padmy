@@ -109,7 +109,7 @@ def test_migrate_verify_invalid(monkeypatch, engine, tmp_path):
     with error_file.open("w") as f:
         f.write(e.value.diff + "\n")
 
-    assert compare_files(error_file, INVALID_MIGRATIONS_DIR / "1-00000000.diff")
+    compare_files(error_file, INVALID_MIGRATIONS_DIR / "1-00000000.diff")
 
 
 SETUP_ERROR_MSG = re.escape(
