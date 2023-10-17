@@ -22,11 +22,11 @@ executors:
 
   build-wheel:
     docker:
-      - image: cimg/python:3.10.8
+      - image: cimg/python:3.10.12-node
 
   tests:
     docker:
-      - image: cimg/python:3.10.8
+      - image: cimg/python:3.10.12-node
         environment:
           PYRIGHT_PYTHON_GLOBAL_NODE: true
       - image: cimg/postgres:14.9-postgis
@@ -51,7 +51,7 @@ jobs:
             wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
             sudo apt-get update && sudo apt-get install postgresql-client-14
       - sre/run-python-tests:
-          extras: '--all-extras'
+          extras: '--all-extras --quiet'
           before-steps:
             - run:
                 name: Initializing DB
