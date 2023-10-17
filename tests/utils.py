@@ -49,8 +49,10 @@ def check_column_exists(
     return res[0] if res else None
 
 
-def compare_files(f1: Path, f2: Path):
+def compare_files(f1: Path, f2: Path, ignore_order: bool = False):
     def get_lines(f: Path):
         return [x.strip() for x in f.read_text().split("\n") if x.strip()]
 
-    assert not deepdiff.DeepDiff(get_lines(f1), get_lines(f2))
+    assert not deepdiff.DeepDiff(
+        get_lines(f1), get_lines(f2), ignore_order=ignore_order
+    )

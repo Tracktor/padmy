@@ -27,6 +27,8 @@ executors:
   tests:
     docker:
       - image: cimg/python:3.10.8
+        environment:
+          PYRIGHT_PYTHON_GLOBAL_NODE: true
       - image: cimg/postgres:14.9-postgis
         environment:
           POSTGRES_PASSWORD: postgres
