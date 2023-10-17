@@ -8,7 +8,7 @@ from ..logs import logs
 try:
     import dash_cytoscape as cyto
 except ImportError:
-    logs.error('Both dash and dash_cytoscape need to be installed')
+    logs.error("Both dash and dash_cytoscape need to be installed")
     raise
 
 from dash import Dash, Output, Input, html
@@ -36,28 +36,23 @@ class DirectedElement(typing.TypedDict):
 
 def get_directed_edges(g: nx.DiGraph) -> list[DirectedElement]:
     directed_edges: list[DirectedElement] = [
-        {'data': {
-            'id': f'{src}{tgt}',
-            'source': src,
-            'target': tgt
-        }
-        }
+        {"data": {"id": f"{src}{tgt}", "source": src, "target": tgt}}
         for src, tgt in g.edges
     ]
-    node_elems: list[DirectedElement] = [{'data': {'id': k, **v}} for k, v in g.nodes.data()]  # type: ignore
+    node_elems: list[DirectedElement] = [{"data": {"id": k, **v}} for k, v in g.nodes.data()]  # type: ignore
     return node_elems + directed_edges
 
 
 _CIRCULAR_NODE_STYLE = {
-    'source-arrow-color': 'red',
-    'source-arrow-shape': 'triangle',
-    'line-color': 'red'
+    "source-arrow-color": "red",
+    "source-arrow-shape": "triangle",
+    "line-color": "red",
 }
 
 _CIRCULAR_EDGE_STYLE = {
-    'source-arrow-color': 'red',
-    'source-arrow-shape': 'triangle',
-    'line-color': 'red'
+    "source-arrow-color": "red",
+    "source-arrow-shape": "triangle",
+    "line-color": "red",
 }
 
 
@@ -69,72 +64,61 @@ def get_cycles_styles(g: nx.DiGraph):
             cycle = cycles[0]
             styles += [
                 {
-                    'selector': f'#{cycle}',
-                    'style': {**_CIRCULAR_NODE_STYLE, 'background-color': 'red'}
+                    "selector": f"#{cycle}",
+                    "style": {**_CIRCULAR_NODE_STYLE, "background-color": "red"},
                 },
                 {
-                    'selector': f'#{cycle}{cycle}',
-                    'style': {**_CIRCULAR_EDGE_STYLE, 'background-color': 'red'}
-                }
+                    "selector": f"#{cycle}{cycle}",
+                    "style": {**_CIRCULAR_EDGE_STYLE, "background-color": "red"},
+                },
             ]
         else:
             _src, _tgt = cycles
             styles += [
                 {
-                    'selector': f'#{_src}',
-                    'style': {**_CIRCULAR_NODE_STYLE, 'background-color': 'red'}
+                    "selector": f"#{_src}",
+                    "style": {**_CIRCULAR_NODE_STYLE, "background-color": "red"},
                 },
                 {
-                    'selector': f'#{_tgt}',
-                    'style': {**_CIRCULAR_NODE_STYLE, 'background-color': 'red'}
+                    "selector": f"#{_tgt}",
+                    "style": {**_CIRCULAR_NODE_STYLE, "background-color": "red"},
                 },
-                {
-                    'selector': f'#{_src}{_tgt}',
-                    'style': _CIRCULAR_EDGE_STYLE
-                },
-                {
-                    'selector': f'#{_tgt}{_src}',
-                    'style': _CIRCULAR_EDGE_STYLE
-                }
+                {"selector": f"#{_src}{_tgt}", "style": _CIRCULAR_EDGE_STYLE},
+                {"selector": f"#{_tgt}{_src}", "style": _CIRCULAR_EDGE_STYLE},
             ]
     return styles
 
 
 # See https://dash.plotly.com/cytoscape/layout for a full list
-Layout = Literal['cose', 'breadthfirst', 'circle',
-                 'preset', 'random', 'grid', 'concentric']
+Layout = Literal[
+    "cose", "breadthfirst", "circle", "preset", "random", "grid", "concentric"
+]
 # needs cyto.load_extra_layouts() to be loaded
-ExternalLayout = Literal['cose-bilkent', 'cola', 'euler', 'spread', 'dagre', 'klay']
+ExternalLayout = Literal["cose-bilkent", "cola", "euler", "spread", "dagre", "klay"]
 
 
-def get_layout(g: nx.DiGraph,
-               *,
-               layout: Layout | ExternalLayout = 'klay',
-               # Eg: {'width': '100%', 'height': '400px'}
-               style: dict | None = None) -> cyto.Cytoscape:
+def get_layout(
+    g: nx.DiGraph,
+    *,
+    layout: Layout | ExternalLayout = "klay",
+    # Eg: {'width': '100%', 'height': '400px'}
+    style: dict | None = None,
+) -> cyto.Cytoscape:
     elements = get_directed_edges(g)
-    _style = style or {'width': '100%', 'height': '800px'}
+    _style = style or {"width": "100%", "height": "800px"}
     stylesheet = [
+        {"selector": "node", "style": {"label": "data(label)"}},
         {
-            'selector': 'node',
-            'style': {
-                'label': 'data(label)'
-            }
+            "selector": "edge",
+            "style": {
+                "curve-style": "bezier",
+                "source-arrow-shape": "triangle",
+            },
         },
-        {
-            'selector': 'edge',
-            'style': {
-                'curve-style': 'bezier',
-                'source-arrow-shape': 'triangle',
-            }
-        },
-        *get_cycles_styles(g)
+        *get_cycles_styles(g),
     ]
     return cyto.Cytoscape(
-        layout={'name': layout},
-        style=_style,
-        elements=elements,
-        stylesheet=stylesheet
+        layout={"name": layout}, style=_style, elements=elements, stylesheet=stylesheet
     )
 
 
@@ -146,19 +130,25 @@ def run_simple_app(db: Database, port: int = 5555):
 
     app = Dash(__name__)
 
-    app.layout = html.Div([
-        cyto_layout,
-        html.Pre(id='cytoscape-tapNodeData-output'),
-        html.Pre(id='cytoscape-tapEdgeData-output'),
-    ])
+    app.layout = html.Div(
+        [
+            cyto_layout,
+            html.Pre(id="cytoscape-tapNodeData-output"),
+            html.Pre(id="cytoscape-tapEdgeData-output"),
+        ]
+    )
 
-    @app.callback(Output('cytoscape-tapNodeData-output', 'children'),
-                  Input(layout_id, 'tapNodeData'))
+    @app.callback(
+        Output("cytoscape-tapNodeData-output", "children"),
+        Input(layout_id, "tapNodeData"),
+    )
     def _on_press_node(data):
         return json.dumps(data, indent=2)
 
-    @app.callback(Output('cytoscape-tapEdgeData-output', 'children'),
-                  Input(layout_id, 'tapEdgeData'))
+    @app.callback(
+        Output("cytoscape-tapEdgeData-output", "children"),
+        Input(layout_id, "tapEdgeData"),
+    )
     def _on_press_edge(data):
         return json.dumps(data, indent=2)
 

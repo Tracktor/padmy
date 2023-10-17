@@ -16,7 +16,7 @@ schemas:
 
 def get_config_lite_expected():
     schemas = [
-        ConfigSchema(schema='schema_1'),
+        ConfigSchema(schema="schema_1"),
     ]
     expected = Config(
         sample=20,
@@ -45,14 +45,17 @@ tables:
 
 def get_config_full_expected():
     schemas = [
-        ConfigSchema(schema='schema_1'),
-        ConfigSchema(schema='schema_2', sample=30),
+        ConfigSchema(schema="schema_1"),
+        ConfigSchema(schema="schema_2", sample=30),
     ]
     tables = [
-        ConfigTable(schema='public', table='table_1',
-                    sample=10,
-                    fields=[AnoFields.load({'bar': 'EMAIL'})]),
-        ConfigTable(schema='public', table='table_2')
+        ConfigTable(
+            schema="public",
+            table="table_1",
+            sample=10,
+            fields=[AnoFields.load({"bar": "EMAIL"})],
+        ),
+        ConfigTable(schema="public", table="table_2"),
     ]
     expected = Config(
         sample=20,
@@ -78,25 +81,36 @@ tables:
 def get_custom_fields_expected():
     expected = Config(
         tables=[
-            ConfigTable(schema='public', table='table_1',
-                        sample=10,
-                        fields=[AnoFields(column='bar', type='EMAIL',
-                                          extra_args={'domain_name': 'tracktor.fr'})]),
+            ConfigTable(
+                schema="public",
+                table="table_1",
+                sample=10,
+                fields=[
+                    AnoFields(
+                        column="bar",
+                        type="EMAIL",
+                        extra_args={"domain_name": "tracktor.fr"},
+                    )
+                ],
+            ),
         ],
     )
     return expected
 
 
-@pytest.mark.parametrize('config, expected', [
-    (CONFIG_LITE, get_config_lite_expected()),
-    (CONFIG_FULL, get_config_full_expected()),
-    (CONFIG_CUSTOM_TABLE_FIELDS, get_custom_fields_expected())
-])
+@pytest.mark.parametrize(
+    "config, expected",
+    [
+        (CONFIG_LITE, get_config_lite_expected()),
+        (CONFIG_FULL, get_config_full_expected()),
+        (CONFIG_CUSTOM_TABLE_FIELDS, get_custom_fields_expected()),
+    ],
+)
 def test_load_config_file(config, expected):
     from padmy.config import Config
 
     with tempfile.TemporaryDirectory() as dir:
-        _file = Path(dir) / 'test.yml'
+        _file = Path(dir) / "test.yml"
         _file.write_text(config)
         config = Config.load_from_file(_file)
 
@@ -107,13 +121,13 @@ def test_load_config():
     from padmy.config import Config, ConfigSchema
 
     schemas = [
-        ConfigSchema(schema='schema_1'),
-        ConfigSchema(schema='schema_2'),
+        ConfigSchema(schema="schema_1"),
+        ConfigSchema(schema="schema_2"),
     ]
 
     expected = Config(
         sample=20,
         schemas=schemas,
     )
-    config = Config.load(sample=20, schemas=['schema_1', 'schema_2'])
+    config = Config.load(sample=20, schemas=["schema_1", "schema_2"])
     assert asdict(config) == asdict(expected), pprint_dataclass_diff(config, expected)
