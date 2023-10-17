@@ -161,7 +161,7 @@ jobs:
       - checkout
       - restore_cache:
           keys:
-            - deps-{{ checksum "poetry.lock" }}
+            - deps-v0-{{ checksum "poetry.lock" }}
       - run:
           name: Adding github.com to known hosts
           command: |
@@ -207,7 +207,7 @@ workflows:
 #        pattern: "^master$"
 #        value: << pipeline.git.branch >>
     jobs:
-#      - run-tests
+      - run-tests
 #      - export-requirements
 #      - export-requirements-network
 #      - build-publish-docker-14:
@@ -224,7 +224,7 @@ workflows:
 #          context: *production_context
       - bump-version:
           context: *production_context
-#          requires: [ run-tests ]
+          requires: [ run-tests ]
 
 #  publish:
 #    jobs:
