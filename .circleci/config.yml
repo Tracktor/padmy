@@ -197,45 +197,45 @@ jobs:
 
 workflows:
 
-#  run-tests:
-#    when:
-#      matches:
-#        pattern: "^(feat|feature|fix)\\/.*$"
-#        value: << pipeline.git.branch >>
-#    jobs:
-#      - run-tests
-
-  production:
-#    when:
-#      matches:
-#        pattern: "^master$"
-#        value: << pipeline.git.branch >>
+  run-tests:
+    when:
+      matches:
+        pattern: "^(feat|feature|fix)\\/.*$"
+        value: << pipeline.git.branch >>
     jobs:
       - run-tests
-#      - export-requirements
-#      - export-requirements-network
-#      - build-publish-docker-14:
-#          requires: [
-#            run-tests,
-#            export-requirements
-#          ]
-#          context: *production_context
-#      - build-publish-docker-network-14:
-#          requires: [
-#            run-tests,
-#            export-requirements-network
-#          ]
-#          context: *production_context
+
+  production:
+    when:
+      matches:
+        pattern: "^master$"
+        value: << pipeline.git.branch >>
+    jobs:
+      - run-tests
+      - export-requirements
+      - export-requirements-network
+      - build-publish-docker-14:
+          requires: [
+            run-tests,
+            export-requirements
+          ]
+          context: *production_context
+      - build-publish-docker-network-14:
+          requires: [
+            run-tests,
+            export-requirements-network
+          ]
+          context: *production_context
       - bump-version:
           context: *production_context
           requires: [ run-tests ]
 
-#  publish:
-#    jobs:
-#      - publish:
-#          context: *pypi_context
-#          filters:
-#            tags:
-#              only: /.*/
-#            branches:
-#              ignore: /.*/
+  publish:
+    jobs:
+      - publish:
+          context: *pypi_context
+          filters:
+            tags:
+              only: /.*/
+            branches:
+              ignore: /.*/
