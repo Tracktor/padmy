@@ -2,7 +2,7 @@ version: 2.1
 
 orbs:
   gh: circleci/github-cli@1.0
-  sre: tracktor/ci-tools@0.1.5
+  sre: tracktor/ci-tools@0.2.7
 
 references:
   staging_context: &staging_context
