@@ -215,9 +215,7 @@ def test_explore(loop, apool):
         await db.explore(apool, ["public", "test"])
 
     loop.run_until_complete(test())
-    import pprint
 
-    pprint.pprint(db.tables)
     assert len(db.tables) == 9
 
     table_1 = [x for x in db.tables if x.full_name == "public.table_1"][0]
