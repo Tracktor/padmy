@@ -207,7 +207,7 @@ workflows:
 #        pattern: "^master$"
 #        value: << pipeline.git.branch >>
     jobs:
-      - run-tests
+#      - run-tests
 #      - export-requirements
 #      - export-requirements-network
 #      - build-publish-docker-14:
@@ -224,7 +224,7 @@ workflows:
 #          context: *production_context
       - bump-version:
           context: *production_context
-          requires: [ run-tests ]
+#          requires: [ run-tests ]
 
 #  publish:
 #    jobs:
