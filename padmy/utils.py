@@ -1,15 +1,15 @@
 import json
-from importlib import reload
-
-import asyncpg
 import os
 import re
 import subprocess
 import typing
-from pathlib import Path
-from piou import Option, Derived, Password
-from typing import Sequence, AsyncIterator, Callable, TypeVar, cast, Literal
 from contextlib import contextmanager
+from importlib import reload
+from pathlib import Path
+from typing import Sequence, AsyncIterator, Callable, TypeVar, cast, Literal
+
+import asyncpg
+from piou import Option, Derived, Password
 
 from padmy import env
 from .env import PG_HOST, PG_PORT, PG_USER, PG_DATABASE, PG_PASSWORD
@@ -297,7 +297,8 @@ def get_pg_root_from(source: Literal["from", "to"]):
         ),
     ):
         url = f"postgresql://{pg_user}:{pg_password}@{pg_host}:{pg_port}"
-        logs.debug(f"PG url {source}: {url}")
+        pg_clean = url.replace(f":{pg_password}", ":********")
+        logs.debug(f"PG url {source}: {pg_clean}")
         return url
 
     return _get_pg_root
