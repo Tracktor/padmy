@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import sys
 from pathlib import Path
 
 import asyncpg
@@ -83,14 +84,19 @@ async def sample_main(
     _schemas = [x.schema for x in config.schemas]
     if copy_db:
         logs.info(f"Copying {from_db!r} to {to_db!r}")
-        copy_database(
-            from_pg_uri=pg_from,
-            to_pg_uri=pg_to,
-            from_db=from_db,
-            to_db=to_db,
-            schemas=_schemas,
-        )
-        logs.info("Done!")
+        try:
+            copy_database(
+                from_pg_uri=pg_from,
+                to_pg_uri=pg_to,
+                from_db=from_db,
+                to_db=to_db,
+                schemas=_schemas,
+            )
+        except Exception as e:
+            logs.error(e)
+            sys.exit(1)
+        else:
+            logs.info("Done!")
 
     # TODO clean if error
     conn = await asyncpg.connect(f"{pg_from}/{from_db}", statement_cache_size=0)
@@ -103,6 +109,9 @@ async def sample_main(
 
     try:
         await sample_database(conn, target_conn, db, show_progress=progress)
+    except Exception as e:
+        logs.error(e)
+        sys.exit(1)
     finally:
         await asyncio.wait_for(conn.close(), timeout=1)
         await asyncio.wait_for(target_conn.close(), timeout=1)
