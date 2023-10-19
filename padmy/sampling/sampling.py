@@ -3,9 +3,9 @@ import contextlib
 import logging
 import tempfile
 from math import floor
+from rich.progress import Progress
 from tracktolib.pg import insert_many, iterate_pg
 from typing import cast
-from rich.progress import Progress
 
 from ..db import Database, Table, FKConstraint
 from ..logs import logs
@@ -59,28 +59,24 @@ def copy_database(
                 port=pg_from_infos["port"],
                 database=from_db,
             )
-        with temp_env({"PG_PASSWORD": pg_target_infos["password"]}):
+
+        _partial_target_infos: dict = dict(pg_target_infos)
+        _partial_target_infos.pop("database")
+        with temp_env({"PG_PASSWORD": _partial_target_infos.pop("password")}):
             drop_db(
                 to_db,
-                user=pg_target_infos["user"],
-                host=pg_target_infos["host"],
-                port=pg_target_infos["port"],
+                **_partial_target_infos,
                 if_exists=True,
             )
-            create_db(
-                database=to_db,
-                user=pg_target_infos["user"],
-                host=pg_target_infos["host"],
-                port=pg_target_infos["port"],
-            )
+            create_db(database=to_db, **_partial_target_infos)
 
-        with temp_env({"PG_PASSWORD": pg_target_infos["password"]}):
             if "public" in schemas or drop_public:
-                exec_psql(to_db, "DROP SCHEMA public;")
+                exec_psql(to_db, "DROP SCHEMA public;", **_partial_target_infos)
             pg_restore(
                 dump_path=tmp_file.name,
                 database=to_db,
                 options=["--no-owner", "--no-privileges"],
+                **_partial_target_infos,
             )
 
 
