@@ -1,15 +1,15 @@
+from importlib import reload
+
+import asyncpg
 import json
 import os
 import re
 import subprocess
 import typing
 from contextlib import contextmanager
-from importlib import reload
 from pathlib import Path
-from typing import Sequence, AsyncIterator, Callable, TypeVar, cast, Literal
-
-import asyncpg
 from piou import Option, Derived, Password
+from typing import Sequence, AsyncIterator, Callable, TypeVar, cast, Literal
 
 from padmy import env
 from .env import PG_HOST, PG_PORT, PG_USER, PG_DATABASE, PG_PASSWORD
@@ -68,9 +68,15 @@ class CommandNotFound(Exception):
         self.cmd = cmd
 
 
+_COMMANDS = {}
+
+
 def check_cmd(cmd: str):
-    if not has_cmd(cmd):
+    global _COMMANDS
+    path = exec_cmd(f'command -v "{cmd}"')
+    if path == "":
         raise CommandNotFound(cmd=cmd)
+    _COMMANDS[cmd] = path.strip()
 
 
 def get_pg_envs():
@@ -84,7 +90,7 @@ def get_pg_envs():
 
 
 def _on_pg_error(msg: str):
-    if "error" in msg:
+    if "error" in msg or "fatal" in msg:
         raise ValueError(msg)
 
 
@@ -114,9 +120,13 @@ def pg_dump(
     port: int | None = None,
 ):
     _schemas = "|".join(x for x in schemas)
-    cmd = ["pg_dump", "-n", f"'({_schemas})'", "-d", database] + _get_conn_infos(
-        user, password, host, port
-    )
+    cmd = [
+        _COMMANDS["pg_dump"],
+        "-n",
+        f"'({_schemas})'",
+        "-d",
+        database,
+    ] + _get_conn_infos(user, password, host, port)
     if options:
         cmd += options
 
@@ -134,7 +144,7 @@ def pg_restore(
     host: str | None = None,
     port: int | None = None,
 ):
-    cmd = ["pg_restore", "-d", database, dump_path] + _get_conn_infos(
+    cmd = [_COMMANDS["pg_restore"], "-d", database, dump_path] + _get_conn_infos(
         user, password, host, port
     )
     if options is not None:
@@ -150,7 +160,9 @@ def create_db(
     host: str | None = None,
     port: int | None = None,
 ):
-    cmd = ["createdb", database] + _get_conn_infos(user, password, host, port)
+    cmd = [_COMMANDS["createdb"], database] + _get_conn_infos(
+        user, password, host, port
+    )
     exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_pg_error)
 
 
@@ -163,7 +175,7 @@ def drop_db(
     host: str | None = None,
     port: int | None = None,
 ):
-    cmd = ["dropdb"] + _get_conn_infos(user, password, host, port)
+    cmd = [_COMMANDS["dropdb"]] + _get_conn_infos(user, password, host, port)
 
     if if_exists:
         cmd.append("--if-exists")
@@ -180,7 +192,7 @@ def exec_psql_file(
     host: str | None = None,
     port: int | None = None,
 ):
-    cmd = ["psql", "-f", sql_file, "-d", database] + _get_conn_infos(
+    cmd = [_COMMANDS["psql"], "-f", sql_file, "-d", database] + _get_conn_infos(
         user, password, host, port
     )
     exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_pg_error)
@@ -195,7 +207,7 @@ def exec_psql(
     host: str | None = None,
     port: int | None = None,
 ):
-    cmd = ["psql", "-c", f"'{query}'", "-d", database] + _get_conn_infos(
+    cmd = [_COMMANDS["psql"], "-c", f"'{query}'", "-d", database] + _get_conn_infos(
         user, password, host, port
     )
     exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_pg_error)
