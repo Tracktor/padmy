@@ -2,7 +2,7 @@ import logging
 
 import pytest
 
-from .conftest import STATIC_DIR
+from .conftest import STATIC_DIR, PG_SAMPLE_DATABASE, PG_DATABASE
 
 
 @pytest.fixture(autouse=True)
@@ -36,11 +36,11 @@ def test_run_sample(capsys, loop):
     cli.run_with_args(
         "sample",
         "--db",
-        "test",
+        PG_DATABASE,
         "--db-to",
-        "test2",
+        PG_SAMPLE_DATABASE,
         "--schemas",
-        "public, test",
+        "public test",
         "--sample",
         5,
         "--copy-db",

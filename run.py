@@ -34,7 +34,7 @@ cli.set_options_processor(on_process)
 
 async def get_explored_db(pg_url: str, db_name: str, schemas: list[str]):
     db = Database(name=db_name)
-    logs.info(f"Gathering information about {db_name!r}...")
+    logs.info(f"Gathering information about {db_name!r} ()...")
     async with asyncpg.create_pool(f"{pg_url}/{db_name}", init=init_connection) as pool:
         await db.explore(pool, schemas)
     return db

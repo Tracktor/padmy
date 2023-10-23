@@ -8,8 +8,8 @@ from rich.table import Table as RTable
 from typing_extensions import Self
 
 from padmy.config import Config, SampleType
-from padmy.utils import get_first, get_conn
 from padmy.logs import logs
+from padmy.utils import get_first, get_conn
 
 
 # if sys.version_info.minor < 11 and sys.version_info.major >= 3:
@@ -90,7 +90,7 @@ class Table:
 
     @property
     def child_tables_safe(self):
-        # return self.child_tables - {self}
+        # Returns the child table that are not the current table
         return {x for x in self.child_tables if x.full_name != self.full_name}
 
     @property
@@ -131,6 +131,14 @@ class Table:
             sorted([f'"{x.name}"' for x in self.columns if not x.is_generated])
         )
 
+    @property
+    def is_leaf(self):
+        return not self.has_children and self.has_parent
+
+    @property
+    def is_root(self):
+        return not self.has_parent
+
     async def load_count(self, conn: asyncpg.Connection):
         self._count = await conn.fetchval(f"SELECT count(*) from {self.full_name}")
 
@@ -167,6 +175,7 @@ async def get_tables(conn: asyncpg.Connection, schemas: list[str]):
     FROM information_schema.tables
     WHERE table_schema = ANY ($1::TEXT[]) AND
     table_type = 'BASE TABLE'
+    ORDER BY table_schema, table_name
     """
     data = await conn.fetch(query, schemas)
     return [Table(**x) for x in data]
@@ -184,7 +193,7 @@ async def get_columns(
                        )
                ) AS columns
     FROM (SELECT *, table_schema || '.' || table_name AS full_name FROM information_schema.columns) t
-    where full_name = ANY ($1::TEXT[])
+    WHERE full_name = ANY ($1::TEXT[])
     GROUP BY full_name
     """
     data = await conn.fetch(query, [x.full_name for x in tables])
@@ -264,11 +273,20 @@ class Database:
     tables: list[Table] = field(default_factory=list)
 
     async def explore(
-        self, pool: asyncpg.Pool, schemas: list[str], *, load_count: bool = True
+        self,
+        pool: asyncpg.Pool,
+        schemas: list[str] | None = None,
+        *,
+        load_count: bool = True,
     ):
+        _schemas = schemas or list(set(x.schema for x in self.tables))
+        if not _schemas:
+            raise ValueError("No schemas to explore")
+
+        _schemas_str = ", ".format()
         async with pool.acquire() as conn:
-            logs.debug(f"Loading tables for {self.name!r}...")
-            self.tables = await get_tables(conn, schemas)
+            logs.debug(f"Loading tables for {_schemas_str}...")
+            self.tables = await get_tables(conn, _schemas)
             logs.debug(f"{len(self.tables)} tables found")
 
             logs.debug("Loading table columns...")
@@ -276,10 +294,10 @@ class Database:
             for table in self.tables:
                 table.columns = columns[table.full_name]
             logs.debug("Loading foreign keys...")
-            fks = await load_foreign_keys(conn, schemas)
+            fks = await load_foreign_keys(conn, _schemas)
             logs.debug(f"{len(fks)} tables found")
             logs.debug("Loading primary keys...")
-            pks = await load_primary_keys(conn, schemas)
+            pks = await load_primary_keys(conn, _schemas)
             logs.debug(f"{len(pks)} primary keys found")
 
         _tables: dict[str, Table] = {_table.full_name: _table for _table in self.tables}
@@ -303,6 +321,9 @@ class Database:
         Loads the sample sizes for each tables from the config file.
         Tables need to have been loaded first
         """
+        if not self.tables:
+            raise ValueError("Tables must be loaded first")
+
         _schemas: dict[str, SampleType | None] = {
             schema.schema: schema.sample for schema in config.schemas
         }

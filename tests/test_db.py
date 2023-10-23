@@ -1,3 +1,5 @@
+import pprint
+
 import pytest
 
 from .utils import pprint_dataclass_diff
@@ -216,7 +218,7 @@ def test_explore(loop, apool):
 
     loop.run_until_complete(test())
 
-    assert len(db.tables) == 9
+    assert len(db.tables) == 9, pprint.pprint(db.tables)
 
     table_1 = [x for x in db.tables if x.full_name == "public.table_1"][0]
     assert len(table_1.child_tables) == 2
