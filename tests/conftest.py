@@ -42,7 +42,10 @@ def engine() -> typing.Generator[psycopg.Connection, None, None]:
 
 @pytest.fixture(scope="session")
 def aengine(loop):
+    from padmy.utils import init_connection
+
     conn = loop.run_until_complete(asyncpg.connect(f"{PG_URL}/{PG_DATABASE}"))
+    loop.run_until_complete(init_connection(conn))
     yield conn
     loop.run_until_complete(conn.close())
 
