@@ -110,6 +110,7 @@ async def sample_main(
     try:
         await sample_database(conn, target_conn, db, show_progress=progress)
     except Exception as e:
+        raise e
         logs.error(e)
         sys.exit(1)
     finally:

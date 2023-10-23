@@ -95,12 +95,13 @@ def get_insert_child_fk_data_query(table: Table, child_table: Table) -> str:
 
     query = (
         f"""
-    INSERT INTO {table.tmp_name}
-    SELECT t.* from {table.full_name} t
+    INSERT INTO {table.tmp_name} ({table.values})
+    SELECT {table.get_values('t')} from {table.full_name} t
     """
         + "\n".join(joins)
         + "\n ON CONFLICT DO NOTHING"
     )
+    print(query)
 
     return query
 
@@ -120,7 +121,7 @@ def get_insert_data_query(table: Table):
 
 
 async def _insert_leaf_table(conn: asyncpg.Connection, table: Table, table_size: int):
-    query = f"CREATE TEMP TABLE {table.tmp_name} ON COMMIT DROP AS SELECT * from {table.full_name}"
+    query = f"CREATE TEMP TABLE {table.tmp_name} ON COMMIT DROP AS SELECT {table.values} from {table.full_name}"
     args = []
     # if table_size > 0:
     query = f"{query} TABLESAMPLE SYSTEM_ROWS($1)"

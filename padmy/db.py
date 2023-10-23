@@ -133,13 +133,17 @@ class Table:
     def count(self, v: int):
         self._count = v
 
-    @property
-    def values(self):
+    def get_values(self, table: str | None = None):
         if self.columns is None:
             raise ValueError("Columns must be loaded first")
+        _table = f"{table}." if table is not None else ""
         return ", ".join(
-            sorted([f'"{x.name}"' for x in self.columns if not x.is_generated])
+            sorted([f'{_table}"{x.name}"' for x in self.columns if not x.is_generated])
         )
+
+    @property
+    def values(self):
+        return self.get_values()
 
     @property
     def is_leaf(self):
