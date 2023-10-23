@@ -7,7 +7,7 @@ from tracktolib.pg_sync import fetch_all, insert_many
 @pytest.mark.parametrize(
     "table,pks,fields,field_types,expected",
     [
-        (
+        pytest.param(
             "public.test",
             ["id1"],
             ["field_1"],
@@ -21,8 +21,9 @@ from tracktolib.pg_sync import fetch_all, insert_many
     ) AS u2(id1, field_1)
     WHERE u2.id1 = u.id1
     """,
+            id="One PK",
         ),
-        (
+        pytest.param(
             "public.test",
             ["id1", "id2"],
             ["field_1", "field_2"],
@@ -36,6 +37,7 @@ from tracktolib.pg_sync import fetch_all, insert_many
     ) AS u2(id1, id2, field_1, field_2)
     WHERE u2.id1 = u.id1 AND u2.id2 = u.id2
     """,
+            id="Multiple PKs",
         ),
     ],
 )

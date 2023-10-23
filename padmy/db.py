@@ -7,7 +7,7 @@ from rich.console import Console
 from rich.table import Table as RTable
 from typing_extensions import Self
 
-from padmy.config import Config, SampleType
+from padmy.config import Config, ConfigTable, ConfigSchema
 from padmy.logs import logs
 from padmy.utils import get_first, get_conn
 
@@ -82,16 +82,26 @@ class Table:
 
     # Sample size
     sample_size: int | None = None
+    # Ignore this table
+    ignore: bool = False
 
     @property
     def parent_tables_safe(self):
         # return self.parent_tables - {self}
-        return {x for x in self.parent_tables if x.full_name != self.full_name}
+        return {
+            x
+            for x in self.parent_tables
+            if x.full_name != self.full_name and not x.ignore
+        }
 
     @property
     def child_tables_safe(self):
         # Returns the child table that are not the current table
-        return {x for x in self.child_tables if x.full_name != self.full_name}
+        return {
+            x
+            for x in self.child_tables
+            if x.full_name != self.full_name and not x.ignore
+        }
 
     @property
     def full_name(self):
@@ -324,21 +334,26 @@ class Database:
         if not self.tables:
             raise ValueError("Tables must be loaded first")
 
-        _schemas: dict[str, SampleType | None] = {
-            schema.schema: schema.sample for schema in config.schemas
+        _schemas: dict[str, ConfigSchema] = {
+            schema.schema: schema for schema in config.schemas
         }
-        _tables: dict[str, SampleType | None] = {
-            f"{_table.schema}.{_table.table}": _table.sample for _table in config.tables
+        _tables: dict[str, ConfigTable] = {
+            f"{_table.schema}.{_table.table}": _table for _table in config.tables
         }
         for _table in self.tables:
-            _schema_sample = _schemas.get(_table.schema)
-            _table_sample = _tables.get(_table.full_name)
+            _config_schema = _schemas.get(_table.schema)
+            _config_table = _tables.get(_table.full_name)
             _sample = get_first(
-                _table_sample, _schema_sample, config.sample, fn=lambda x: x is not None
+                _config_table.sample if _config_table is not None else None,
+                _config_schema.sample if _config_schema is not None else None,
+                config.sample,
+                fn=lambda x: x is not None,
             )
             if _sample is None:
                 raise ValueError("_sample must not be empty")
             _table.sample_size = int(_sample)
+            if _config_table is not None:
+                _table.ignore = _config_table.ignore
 
 
 def pretty_print_stats(database: Database):

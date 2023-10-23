@@ -218,11 +218,11 @@ def test_explore(loop, apool):
 
     loop.run_until_complete(test())
 
-    assert len(db.tables) == 9, pprint.pprint(db.tables)
+    assert len(db.tables) == 11, pprint.pprint(db.tables)
 
     table_1 = [x for x in db.tables if x.full_name == "public.table_1"][0]
-    assert len(table_1.child_tables) == 2
-    assert len(table_1.child_tables_safe) == 2
+    assert len(table_1.child_tables) == 3
+    assert len(table_1.child_tables_safe) == 3
     assert table_1.has_children
     assert not table_1.children_has_been_processed
     # Parents

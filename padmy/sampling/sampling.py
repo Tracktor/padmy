@@ -112,9 +112,10 @@ def get_insert_data_query(table: Table):
     query = f"""
     INSERT into {table.tmp_name} ({table.values})
     SELECT {table.values} from {table.full_name} t1
-    where not exists(select null from {table.tmp_name} t2 where {where_str})
-    limit $1
     """
+    if where_str:
+        query = f"{query}\nwhere not exists(select null from {table.tmp_name} t2 where {where_str})"
+    query = f"{query}\nLIMIT $1"
     return query
 
 
@@ -136,10 +137,6 @@ async def _insert_node_table(conn: asyncpg.Connection, table: Table, table_size:
 
     # Inserting data from child table
     for _child_table in table.child_tables_safe:
-        # Should not be needed
-        # table_exists = await check_tmp_table_exists(conn, _child_table.full_name)
-        # if not table_exists:
-        #     continue
         query = get_insert_child_fk_data_query(table, _child_table)
         logs.debug(f"Insert child data query: {query}")
         await conn.execute(query)
@@ -202,10 +199,6 @@ async def process_table(table: Table, conn: asyncpg.Connection) -> set[Table]:
                 if not _child_table.has_been_processed
             }
 
-    # if logs.level == logging.DEBUG:
-    #     c = await conn.fetchval(f"SELECT count(*) from {table.tmp_name}")
-    #     logs.debug(f"{table.tmp_name}: {c}")
-
     table.has_been_processed = True
 
     return {
@@ -245,6 +238,7 @@ async def create_temp_tables(
         table
         for table in tables
         if (table.is_root if start_from == "node" else table.is_leaf)
+        and not table.ignore
     )
 
     if not _tables:

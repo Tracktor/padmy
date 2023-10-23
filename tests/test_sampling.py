@@ -270,7 +270,7 @@ def setup_3_simple_tables(engine, sample_engine):
         ),
     ],
 )
-@pytest.mark.usefixtures("setup_test_db")
+@pytest.mark.usefixtures("setup_test_db", "setup_sample_tables")
 def test_create_tmp_tables(
     loop,
     aengine,
