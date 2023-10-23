@@ -88,6 +88,7 @@ class ConfigSchema:
 
 @dataclass
 class Config:
+    # Sample size in percentage
     sample: SampleType | None = None
     schemas: list[ConfigSchema] = field(default_factory=list)
     tables: list[ConfigTable] = field(default_factory=list)

@@ -1,6 +1,5 @@
 import asyncio
 import itertools
-import logging
 import operator
 from functools import partial
 from typing import Any, Iterator
@@ -8,6 +7,7 @@ from typing import Any, Iterator
 import asyncpg
 from faker import Faker
 
+from padmy.logs import logs
 from ..config import Config, ConfigTable, FieldType, AnoFields
 from ..db import load_primary_keys, load_columns_type
 from ..utils import get_conn, iterate_pg
@@ -88,7 +88,7 @@ async def anonymize_db(pool: asyncpg.Pool, config: Config, faker: Faker):
     _tables_to_anonymize = [_table for _table in config.tables if _table.has_ano_fields]
 
     if not _tables_to_anonymize:
-        logging.info("No tables found to anonymize in config file")
+        logs.info("No tables found to anonymize in config file")
         return
 
     async with pool.acquire() as conn:
