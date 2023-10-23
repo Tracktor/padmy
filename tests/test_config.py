@@ -98,12 +98,32 @@ def get_custom_fields_expected():
     return expected
 
 
+CONFIG_IGNORE = """
+tables:
+  - schema: public
+    table: table_1
+    ignore: true
+"""
+
+
+def get_ignore_table_expected():
+    expected = Config(
+        tables=[
+            ConfigTable(schema="public", table="table_1", ignore=True),
+        ],
+    )
+    return expected
+
+
 @pytest.mark.parametrize(
     "config, expected",
     [
-        (CONFIG_LITE, get_config_lite_expected()),
-        (CONFIG_FULL, get_config_full_expected()),
-        (CONFIG_CUSTOM_TABLE_FIELDS, get_custom_fields_expected()),
+        pytest.param(CONFIG_LITE, get_config_lite_expected(), id="Config lite"),
+        pytest.param(CONFIG_FULL, get_config_full_expected(), id="Config full"),
+        pytest.param(
+            CONFIG_CUSTOM_TABLE_FIELDS, get_custom_fields_expected(), id="Custom fields"
+        ),
+        pytest.param(CONFIG_IGNORE, get_ignore_table_expected(), id="Config ignore"),
     ],
 )
 def test_load_config_file(config, expected):

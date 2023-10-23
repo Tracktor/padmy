@@ -27,6 +27,17 @@ CREATE TABLE IF NOT EXISTS public.table_4
     id SERIAL PRIMARY KEY
 );
 
+CREATE TABLE IF NOT EXISTS public.no_pk
+(
+    foo TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.no_pk_with_fk
+(
+    table_1_id INT REFERENCES public.table_1 ON DELETE CASCADE,
+    foo        TEXT NOT NULL
+);
+
 -- Classic Multi-schema
 
 CREATE TABLE IF NOT EXISTS public.multi_schema_1
