@@ -125,7 +125,7 @@ def get_insert_data_query(table: Table):
 
 
 async def _insert_leaf_table(conn: asyncpg.Connection, table: Table, table_size: int):
-    query = f"CREATE TEMP TABLE {table.tmp_name} ON COMMIT DROP AS SELECT {table.values} from {table.full_name}"
+    query = f"CREATE TEMP TABLE {table.tmp_name} ON COMMIT DROP AS SELECT * from {table.full_name}"
     args = []
     # if table_size > 0:
     query = f"{query} TABLESAMPLE SYSTEM_ROWS($1)"
