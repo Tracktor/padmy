@@ -86,7 +86,12 @@ def get_insert_child_fk_data_query(table: Table, child_table: Table) -> str:
     joins = []
 
     def _fk_join(tmp_name: str, fk: FKConstraint, fk_index: int) -> str:
-        return f"inner join {tmp_name} _s{fk_index} on _s{fk_index}.{fk.column_name} = t.{fk.foreign_column_name}"
+        return f"inner join {tmp_name} _s{fk_index} on " + " and ".join(
+            f"_s{fk_index}.{column_name} = t.{foreign_column_name}"
+            for column_name, foreign_column_name in zip(
+                fk.column_names, fk.foreign_column_names
+            )
+        )
 
     for i, _fk in enumerate(child_table.foreign_keys):
         if _fk.foreign_full_name != table.full_name:
@@ -101,7 +106,6 @@ def get_insert_child_fk_data_query(table: Table, child_table: Table) -> str:
         + "\n".join(joins)
         + "\n ON CONFLICT DO NOTHING"
     )
-    print(query)
 
     return query
 

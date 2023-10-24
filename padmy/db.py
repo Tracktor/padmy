@@ -25,13 +25,13 @@ def _get_full_name(schema: str | None, table: str | None) -> str:
 
 @dataclass
 class FKConstraint:
-    column_name: str
+    column_names: list[str]
     constraint_name: str
 
     # references
     foreign_schema: str
     foreign_table: str
-    foreign_column_name: str
+    foreign_column_names: list[str]
 
     table: str | None = None
     schema: str | None = None
@@ -218,25 +218,27 @@ async def get_columns(
 
 
 SCHEMA_FK_QUERY = """
-SELECT
-    tc.table_schema AS schema,
-    tc.constraint_name,
-    tc.table_name AS table,
-    kcu.column_name,
-    ccu.table_schema AS foreign_schema,
-    ccu.table_name AS foreign_table,
-    ccu.column_name AS foreign_column_name
-FROM
-    information_schema.table_constraints AS tc
-    JOIN information_schema.key_column_usage AS kcu
-      ON tc.constraint_name = kcu.constraint_name
-        AND tc.table_schema = kcu.table_schema
-    JOIN information_schema.constraint_column_usage AS ccu
-      ON ccu.constraint_name = tc.constraint_name
-        -- AND ccu.table_schema = tc.table_schema
-WHERE tc.constraint_type = 'FOREIGN KEY' AND 
-    tc.table_schema = ANY ($1::TEXT[]) AND
-    ccu.table_schema = ANY ($1::TEXT[]);
+SELECT c.conname                                         AS constraint_name,
+       sch.nspname                                       AS schema_name,
+       tbl.relname                                       AS table_name,
+       ARRAY_AGG(col.attname ORDER BY u.attposition)     AS column_names,
+       f_sch.nspname                                     AS foreign_schema_name,
+       f_tbl.relname                                     AS foreign_table_name,
+       ARRAY_AGG(f_col.attname ORDER BY f_u.attposition) AS foreign_column_names
+FROM pg_constraint c
+         LEFT JOIN LATERAL UNNEST(c.conkey) WITH ORDINALITY AS u(attnum, attposition) ON TRUE
+         LEFT JOIN LATERAL UNNEST(c.confkey) WITH ORDINALITY AS f_u(attnum, attposition)
+                   ON f_u.attposition = u.attposition
+         JOIN pg_class tbl ON tbl.oid = c.conrelid
+         JOIN pg_namespace sch ON sch.oid = tbl.relnamespace
+         LEFT JOIN pg_attribute col ON (col.attrelid = tbl.oid AND col.attnum = u.attnum)
+         LEFT JOIN pg_class f_tbl ON f_tbl.oid = c.confrelid
+         LEFT JOIN pg_namespace f_sch ON f_sch.oid = f_tbl.relnamespace
+         LEFT JOIN pg_attribute f_col ON (f_col.attrelid = f_tbl.oid AND f_col.attnum = f_u.attnum)
+WHERE c.contype = 'f' 
+    AND sch.nspname = ANY ($1::TEXT[]) 
+GROUP BY constraint_name, "schema_name", "table_name", f_sch.nspname, f_tbl.relname
+ORDER BY "schema_name", "table_name", "constraint_name";
 """
 
 SCHEMA_PK_QUERY = """
@@ -254,7 +256,18 @@ WHERE constraint_type = 'PRIMARY KEY' AND tc.table_schema = ANY ($1::TEXT[]);
 
 async def load_foreign_keys(conn: asyncpg.Connection, schemas: list[str]):
     data = await conn.fetch(SCHEMA_FK_QUERY, schemas)
-    return [FKConstraint(**x) for x in data]
+    return [
+        FKConstraint(
+            column_names=x["column_names"],
+            constraint_name=x["constraint_name"],
+            foreign_schema=x["foreign_schema_name"],
+            foreign_table=x["foreign_table_name"],
+            foreign_column_names=x["foreign_column_names"],
+            table=x["table_name"],
+            schema=x["schema_name"],
+        )
+        for x in data
+    ]
 
 
 async def load_primary_keys(conn: asyncpg.Connection, schemas: list[str]):

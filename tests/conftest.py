@@ -93,7 +93,7 @@ def setup_test_db():
 PG_SAMPLE_DATABASE = "sample"
 
 
-@pytest.fixture()
+@pytest.fixture(autouse=True, scope="session")
 def setup_sample_db():
     pg_conn = psycopg.connect(f"{PG_URL}/postgres")
     pg_conn.autocommit = True
