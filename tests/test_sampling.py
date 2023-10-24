@@ -23,11 +23,11 @@ def get_table_one_constraint():
 
     fks = [
         FKConstraint(
-            column_name="table_1_id",
+            column_names=["table_1_id"],
             constraint_name="t2_t1_id",
             foreign_schema="public",
             foreign_table="table_1",
-            foreign_column_name="id",
+            foreign_column_names=["id"],
         )
     ]
     table = Table(schema="public", table="table_2", foreign_keys=fks)
@@ -40,18 +40,18 @@ def get_table_multiple_constraints():
 
     table_fks = [
         FKConstraint(
-            column_name="table_1_id",
+            column_names=["table_1_id"],
             constraint_name="t3_t1_id",
             foreign_schema="public",
             foreign_table="table_1",
-            foreign_column_name="id",
+            foreign_column_names=["id"],
         ),
         FKConstraint(
-            column_name="table_2_id",
+            column_names=["table_2_id"],
             constraint_name="t3_t2_id",
             foreign_schema="public",
             foreign_table="table_2",
-            foreign_column_name="id",
+            foreign_column_names=["id"],
         ),
     ]
     table = Table(schema="public", table="table_3", foreign_keys=table_fks)
@@ -66,11 +66,11 @@ def test_sample_db_circular_single(loop, aengine):
 
     fks = [
         FKConstraint(
-            column_name="parent_id",
+            column_names=["parent_id"],
             constraint_name="test",
             foreign_schema="public",
             foreign_table="single_circular",
-            foreign_column_name="id",
+            foreign_column_names=["id"],
         )
     ]
     table = Table(
@@ -97,11 +97,11 @@ def test_sample_db_circular_multiple(loop, aengine):
         table="single_circular",
         foreign_keys=[
             FKConstraint(
-                column_name="parent_id",
+                column_names=["parent_id"],
                 constraint_name="test",
                 foreign_schema="public",
                 foreign_table="single_circular",
-                foreign_column_name="id",
+                foreign_column_names=["id"],
             )
         ],
         sample_size=20,
@@ -112,11 +112,11 @@ def test_sample_db_circular_multiple(loop, aengine):
         table="single_circular",
         foreign_keys=[
             FKConstraint(
-                column_name="multiple_circular_id",
+                column_names=["multiple_circular_id"],
                 constraint_name="test2",
                 foreign_schema="public",
                 foreign_table="multiple_circular",
-                foreign_column_name="id",
+                foreign_column_names=["id"],
             )
         ],
         sample_size=20,

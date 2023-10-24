@@ -81,8 +81,8 @@ CREATE TABLE IF NOT EXISTS cschema2.table_1
 DEFAULT = {
     "schema": "cschema",
     "foreign_schema": "cschema",
-    "foreign_column_name": "id",
-    "column_name": "table_1_id",
+    "foreign_column_names": ["id"],
+    "column_names": ["table_1_id"],
 }
 
 _FKS_PARAMS = [
@@ -121,7 +121,7 @@ _FKS_PARAMS = [
                 "table": "table_3",
                 "foreign_table": "table_2",
                 "constraint_name": "table_3_table_2_id_fkey",
-                "column_name": "table_2_id",
+                "column_names": ["table_2_id"],
             },
         ],
     ),
