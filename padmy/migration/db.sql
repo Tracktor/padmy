@@ -3,18 +3,6 @@ SET SCHEMA 'public';
 DO
 $$
     BEGIN
-        CREATE TYPE MIGRATION_TYPE AS ENUM (
-            'up',
-            'down'
-            );
-    EXCEPTION
-        WHEN duplicate_object THEN null;
-    END
-$$;
-
-DO
-$$
-    BEGIN
         CREATE DOMAIN MIGRATION_TYPE AS TEXT;
     EXCEPTION
         WHEN duplicate_object THEN NULL;
