@@ -12,6 +12,21 @@ $$
     END
 $$;
 
+DO
+$$
+    BEGIN
+        CREATE DOMAIN MIGRATION_TYPE AS TEXT;
+    EXCEPTION
+        WHEN duplicate_object THEN NULL;
+    END
+$$;
+
+ALTER DOMAIN MIGRATION_TYPE DROP CONSTRAINT IF EXISTS migration_type_check;
+ALTER DOMAIN MIGRATION_TYPE ADD CONSTRAINT migration_type_check CHECK (value = ANY (ARRAY [
+    'up',
+    'down']));
+
+
 CREATE TABLE IF NOT EXISTS public.migration
 (
     id             serial PRIMARY KEY NOT NULL,

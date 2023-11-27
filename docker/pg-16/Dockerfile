@@ -1,7 +1,8 @@
 FROM python:3.10-alpine
 
 
-RUN apk --no-cache add bash postgresql16-client && \
+RUN apk --no-cache add bash && \
+    apk --no-cache add postgresql16-client --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main && \
     addgroup user && \
     adduser -s /bin/bash -D -G user user
 
