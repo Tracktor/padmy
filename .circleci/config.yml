@@ -11,6 +11,17 @@ references:
   pypi_context: &pypi_context
     - pypi
     - github
+
+  filters_not_tagged: &filters_not_tagged
+    tags:
+      ignore: /.*/
+
+  filters_only_master: &filters_only_master
+    tags:
+      ignore: /.*/
+    branches:
+      only: /^master$/
+
   filters_only_tags: &filters_only_tags
     tags:
       only: /.*/
@@ -242,23 +253,15 @@ jobs:
 workflows:
 
   run-tests:
-    when:
-      matches:
-        pattern: "^(feat|feature|fix)\\/.*$"
-        value: << pipeline.git.branch >>
     jobs:
-      - run-tests
-
-  production:
-    when:
-      matches:
-        pattern: "^master$"
-        value: << pipeline.git.branch >>
-    jobs:
-      - run-tests
+      - run-tests:
+          filters: *filters_not_tagged
       - bump-version:
+          filters: *filters_only_master
           context: *production_context
-          requires: [ run-tests ]
+          requires: [
+            run-tests,
+          ]
 
   publish:
     jobs:
