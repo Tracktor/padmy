@@ -24,11 +24,10 @@ pyright = "^1.1.331"
 pytest = "^7.1.2"
 pytest-cov = "^4.0.0"
 deepdiff = "^5.8.1"
-ruff = "^0.1.0"
+ruff = "^0.1.6"
 commitizen = "^3.11.0"
 psycopg = "^3.1.12"
 tracktolib = { version = ">=0.41.0", extras = ["pg-sync"] }
-black = "^23.9.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
