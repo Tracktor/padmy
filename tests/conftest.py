@@ -54,9 +54,7 @@ def aengine(loop):
 def apool(loop):
     from padmy.utils import init_connection
 
-    pool = loop.run_until_complete(
-        asyncpg.create_pool(f"{PG_URL}/{PG_DATABASE}", loop=loop, init=init_connection)
-    )
+    pool = loop.run_until_complete(asyncpg.create_pool(f"{PG_URL}/{PG_DATABASE}", loop=loop, init=init_connection))
     yield pool
     loop.run_until_complete(asyncio.wait_for(pool.close(), timeout=3))
 

@@ -85,9 +85,7 @@ def _verify_migration(
             fromfile=_before_dump_file.name,
             tofile=_after_dump_file.name,
         )
-        raise MigrationError(
-            f"Difference found for migration: {migration_id}", diff="\n".join(diff)
-        )
+        raise MigrationError(f"Difference found for migration: {migration_id}", diff="\n".join(diff))
 
 
 def migrate_verify(
@@ -107,9 +105,7 @@ def migrate_verify(
     logs.info("Checking...")
     _down_files: list[MigrationFile] = []
     try:
-        for i, (_up_file, _down_file) in enumerate(
-            iter_migration_files(migration_files)
-        ):
+        for i, (_up_file, _down_file) in enumerate(iter_migration_files(migration_files)):
             _verify_migration(
                 database=database,
                 schemas=schemas,
@@ -175,21 +171,14 @@ async def migrate_up(
     to the latest one in the `folder` dir.
     """
     latest_migration = await _get_latest_migration(conn)
-    logs.info(
-        f"Latest timestamp: {latest_migration.timestamp}"
-        if latest_migration
-        else "No previous migration found"
-    )
+    logs.info(f"Latest timestamp: {latest_migration.timestamp}" if latest_migration else "No previous migration found")
     migration_files = get_files(folder)
 
     migrations_to_apply = [
         _up_file
         for _up_file, _ in iter_migration_files(migration_files)
         if latest_migration is None
-        or (
-            _up_file.ts >= latest_migration.timestamp
-            and _up_file.path.name != latest_migration.file_name
-        )
+        or (_up_file.ts >= latest_migration.timestamp and _up_file.path.name != latest_migration.file_name)
     ]
     if nb_migrations > 0:
         migrations_to_apply = migrations_to_apply[:nb_migrations]
@@ -236,10 +225,7 @@ async def migrate_down(
         _down_file
         for _, _down_file in iter_migration_files(migration_files)
         if latest_migration is None
-        or (
-            _down_file.ts <= latest_migration.timestamp
-            and _down_file.path.name != latest_migration.file_name
-        )
+        or (_down_file.ts <= latest_migration.timestamp and _down_file.path.name != latest_migration.file_name)
     ]
 
     if nb_migrations > 0:

@@ -35,9 +35,7 @@ def create_new_migration(folder: Path):
     folder.mkdir(exist_ok=True, parents=True)
 
     _base_name = f"{int(time.time())}-{str(uuid.uuid4())[:8]}"
-    _CONSOLE.print(
-        f"\nCreating new migration file ([green]{escape(_base_name)}[/green]):\n"
-    )
+    _CONSOLE.print(f"\nCreating new migration file ([green]{escape(_base_name)}[/green]):\n")
 
     last_migration = _get_last_migration_name(folder)
     logs.debug(f"Last migration files: {last_migration}")

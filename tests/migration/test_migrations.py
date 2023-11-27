@@ -48,9 +48,7 @@ def test_create_new_migration(monkeypatch, migration_dir, capsys):
     create_new_migration(folder=migration_dir)
     new_files = list(migration_dir.glob("*.sql"))
     assert capsys.readouterr().out.strip().startswith("Creating new migration file")
-    down_file2, up_file2 = sorted(
-        new_files, key=lambda x: x.name.split("-")[0], reverse=True
-    )[:2]
+    down_file2, up_file2 = sorted(new_files, key=lambda x: x.name.split("-")[0], reverse=True)[:2]
     up_content = [x.rstrip() for x in up_file2.open().readlines() if x.strip()]
     assert up_content == [f"-- Prev-file: {up_file.name}", f"-- Author: {TEST_EMAIL}"]
     down_content = [x.rstrip() for x in down_file2.open().readlines() if x.strip()]
@@ -95,9 +93,7 @@ def test_migrate_verify_invalid(monkeypatch, engine, tmp_path):
     from padmy.migration import migrate_verify
     from padmy.migration.migration import MigrationError
 
-    with pytest.raises(
-        MigrationError, match=re.escape("Difference found for migration: 00000000")
-    ):
+    with pytest.raises(MigrationError, match=re.escape("Difference found for migration: 00000000")):
         migrate_verify(
             database=PG_DATABASE,
             schemas=["general"],
@@ -116,8 +112,7 @@ def test_migrate_verify_invalid(monkeypatch, engine, tmp_path):
 
 
 SETUP_ERROR_MSG = re.escape(
-    'Could not find table table "public.migration", '
-    'did you forget to setup the table by running "migration setup" ?'
+    'Could not find table table "public.migration", ' 'did you forget to setup the table by running "migration setup" ?'
 )
 
 
@@ -157,9 +152,7 @@ def test_migrate_up_down(engine, monkeypatch, caplog, aengine, loop):
     assert len(data) == 0
 
     # 1rst migration
-    loop.run_until_complete(
-        migrate_up(aengine, folder=VALID_MIGRATIONS_DIR, nb_migrations=1)
-    )
+    loop.run_until_complete(migrate_up(aengine, folder=VALID_MIGRATIONS_DIR, nb_migrations=1))
 
     assert check_table_exists(engine, "general", "test")
     assert check_table_exists(engine, "general", "test2")
@@ -174,9 +167,7 @@ def test_migrate_up_down(engine, monkeypatch, caplog, aengine, loop):
 
     # 2nd migration
 
-    loop.run_until_complete(
-        migrate_up(aengine, folder=VALID_MIGRATIONS_DIR, nb_migrations=1)
-    )
+    loop.run_until_complete(migrate_up(aengine, folder=VALID_MIGRATIONS_DIR, nb_migrations=1))
 
     assert check_column_exists(engine, "general", "test", "baz")
     data = fetch_all(engine, "SELECT * FROM public.migration")
@@ -186,16 +177,12 @@ def test_migrate_up_down(engine, monkeypatch, caplog, aengine, loop):
     assert data["migration_type"] == "up"
 
     # 3rd migration
-    loop.run_until_complete(
-        migrate_up(aengine, folder=VALID_MIGRATIONS_DIR, nb_migrations=1)
-    )
+    loop.run_until_complete(migrate_up(aengine, folder=VALID_MIGRATIONS_DIR, nb_migrations=1))
     messages = [rec.message for rec in caplog.records]
     assert messages[-1] == "No migrations to apply"
 
     # Migrate down
-    loop.run_until_complete(
-        migrate_down(aengine, folder=VALID_MIGRATIONS_DIR, nb_migrations=1)
-    )
+    loop.run_until_complete(migrate_down(aengine, folder=VALID_MIGRATIONS_DIR, nb_migrations=1))
     assert check_table_exists(engine, "general", "test")
     assert check_table_exists(engine, "general", "test2")
     assert not check_table_exists(engine, "general", "baz")
@@ -204,9 +191,7 @@ def test_migrate_up_down(engine, monkeypatch, caplog, aengine, loop):
     assert data[0]["migration_type"] == "down"
 
     # Migrate down a second time
-    loop.run_until_complete(
-        migrate_down(aengine, folder=VALID_MIGRATIONS_DIR, nb_migrations=1)
-    )
+    loop.run_until_complete(migrate_down(aengine, folder=VALID_MIGRATIONS_DIR, nb_migrations=1))
     assert not check_table_exists(engine, "general", "test")
     assert not check_table_exists(engine, "general", "test2")
     data = fetch_all(engine, "SELECT * FROM public.migration ORDER BY applied_at DESC")

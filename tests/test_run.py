@@ -51,8 +51,6 @@ def test_run_sample(capsys, loop):
 def test_run_copy_db(capsys):
     from run import cli
 
-    cli.run_with_args(
-        "copy-db", "--db", "test", "--db-to", "test2", "--schemas", "public"
-    )
+    cli.run_with_args("copy-db", "--db", "test", "--db-to", "test2", "--schemas", "public")
     capsys.readouterr()
     # _ = capsys.readouterr().out

@@ -16,9 +16,7 @@ from ..utils import get_conn, iterate_pg
 def get_update_query(table: str, pks: list[str], fields: list[str], field_types: dict):
     _table_keys = pks + fields
     _set_fields = ", ".join(f"{_field} = u2.{_field}" for _field in fields)
-    _values = ", ".join(
-        f"${i + 1}::{field_types[k]}" for i, k in enumerate(_table_keys)
-    )
+    _values = ", ".join(f"${i + 1}::{field_types[k]}" for i, k in enumerate(_table_keys))
     _where = " and ".join(f"u2.{_pk} = u.{_pk}" for _pk in pks)
 
     query = f"""
@@ -33,9 +31,7 @@ def get_update_query(table: str, pks: list[str], fields: list[str], field_types:
     return query
 
 
-def _get_fake_value(
-    faker: Faker, field: FieldType, extra_fields: dict | None = None
-) -> Any:
+def _get_fake_value(faker: Faker, field: FieldType, extra_fields: dict | None = None) -> Any:
     _extra_fields = extra_fields or {}
     match field:
         case "EMAIL":
@@ -69,18 +65,13 @@ async def anonymize_table(
     query = f"SELECT {', '.join(pks)} from {table.schema}.{table.table}"
 
     fields = [x.column for x in table.fields]
-    fields_types = await load_columns_type(
-        conn, table.schema, table.table, pks + fields
-    )
+    fields_types = await load_columns_type(conn, table.schema, table.table, pks + fields)
     update_query = get_update_query(table.full_name, pks, fields, fields_types)
 
     async with conn.transaction():
         async for chunk in iterate_pg(conn, query, chunk_size=chunk_size):
             mock_data = gen_mock_data(faker, fields=table.fields, size=chunk_size)
-            new_data = [
-                dict_to_tuple({**c, **m}, pks + fields)
-                for c, m in zip(chunk, mock_data)
-            ]
+            new_data = [dict_to_tuple({**c, **m}, pks + fields) for c, m in zip(chunk, mock_data)]
             await conn.executemany(update_query, new_data)
 
 
@@ -92,15 +83,11 @@ async def anonymize_db(pool: asyncpg.Pool, config: Config, faker: Faker):
         return
 
     async with pool.acquire() as conn:
-        pks = await load_primary_keys(
-            conn, list({_table.schema for _table in _tables_to_anonymize})
-        )
+        pks = await load_primary_keys(conn, list({_table.schema for _table in _tables_to_anonymize}))
 
     _pks = {
         _table_name: list(_table_pks)
-        for _table_name, _table_pks in itertools.groupby(
-            pks, operator.attrgetter("full_name")
-        )
+        for _table_name, _table_pks in itertools.groupby(pks, operator.attrgetter("full_name"))
     }
 
     await asyncio.gather(

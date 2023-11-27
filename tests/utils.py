@@ -40,9 +40,7 @@ SELECT EXISTS (
 """
 
 
-def check_column_exists(
-    engine: psycopg.Connection, schema: str, table: str, column: str
-):
+def check_column_exists(engine: psycopg.Connection, schema: str, table: str, column: str):
     with engine.cursor() as c:
         c.execute(_COLUMN_EXISTS_QUERY, (schema, table, column))
         res = c.fetchone()
@@ -53,6 +51,4 @@ def compare_files(f1: Path, f2: Path, ignore_order: bool = False):
     def get_lines(f: Path):
         return [x.strip() for x in f.read_text().split("\n") if x.strip()]
 
-    assert not deepdiff.DeepDiff(
-        get_lines(f1), get_lines(f2), ignore_order=ignore_order
-    )
+    assert not deepdiff.DeepDiff(get_lines(f1), get_lines(f2), ignore_order=ignore_order)

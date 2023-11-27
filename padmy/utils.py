@@ -144,9 +144,7 @@ def pg_restore(
     host: str | None = None,
     port: int | None = None,
 ):
-    cmd = [_COMMANDS["pg_restore"], "-d", database, dump_path] + _get_conn_infos(
-        user, password, host, port
-    )
+    cmd = [_COMMANDS["pg_restore"], "-d", database, dump_path] + _get_conn_infos(user, password, host, port)
     if options is not None:
         cmd += options
     exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_pg_error)
@@ -160,9 +158,7 @@ def create_db(
     host: str | None = None,
     port: int | None = None,
 ):
-    cmd = [_COMMANDS["createdb"], database] + _get_conn_infos(
-        user, password, host, port
-    )
+    cmd = [_COMMANDS["createdb"], database] + _get_conn_infos(user, password, host, port)
     exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_pg_error)
 
 
@@ -192,9 +188,7 @@ def exec_psql_file(
     host: str | None = None,
     port: int | None = None,
 ):
-    cmd = [_COMMANDS["psql"], "-f", sql_file, "-d", database] + _get_conn_infos(
-        user, password, host, port
-    )
+    cmd = [_COMMANDS["psql"], "-f", sql_file, "-d", database] + _get_conn_infos(user, password, host, port)
     exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_pg_error)
 
 
@@ -207,9 +201,7 @@ def exec_psql(
     host: str | None = None,
     port: int | None = None,
 ):
-    cmd = [_COMMANDS["psql"], "-c", f"'{query}'", "-d", database] + _get_conn_infos(
-        user, password, host, port
-    )
+    cmd = [_COMMANDS["psql"], "-c", f"'{query}'", "-d", database] + _get_conn_infos(user, password, host, port)
     exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_pg_error)
 
 
@@ -324,9 +316,7 @@ class PGUriInfos(typing.TypedDict):
     database: str | None
 
 
-_PG_URI_REG = re.compile(
-    r"postgresql:\/\/(?P<user>.*):(?P<password>.*)@(?P<host>.*):(?P<port>\d+)(\/(?P<dbname>.*))?"
-)
+_PG_URI_REG = re.compile(r"postgresql:\/\/(?P<user>.*):(?P<password>.*)@(?P<host>.*):(?P<port>\d+)(\/(?P<dbname>.*))?")
 
 
 def parse_pg_uri(uri: str) -> PGUriInfos:
@@ -356,9 +346,5 @@ def temp_env(new_env: dict):
 
 
 async def init_connection(conn: asyncpg.Connection):
-    await conn.set_type_codec(
-        "jsonb", encoder=json.dumps, decoder=json.loads, schema="pg_catalog"
-    )
-    await conn.set_type_codec(
-        "json", encoder=json.dumps, decoder=json.loads, schema="pg_catalog"
-    )
+    await conn.set_type_codec("jsonb", encoder=json.dumps, decoder=json.loads, schema="pg_catalog")
+    await conn.set_type_codec("json", encoder=json.dumps, decoder=json.loads, schema="pg_catalog")

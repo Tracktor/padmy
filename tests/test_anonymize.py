@@ -45,10 +45,7 @@ def test_get_update_query(table, pks, fields, field_types, expected):
     from padmy.anonymize.anonymize import get_update_query
 
     query = get_update_query(table, pks, fields, field_types)
-    assert (
-        textwrap.dedent(query).strip().lower()
-        == textwrap.dedent(expected).strip().lower()
-    )
+    assert textwrap.dedent(query).strip().lower() == textwrap.dedent(expected).strip().lower()
 
 
 @pytest.fixture()
