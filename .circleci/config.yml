@@ -2,11 +2,9 @@ version: 2.1
 
 orbs:
   gh: circleci/github-cli@1.0
-  sre: tracktor/ci-tools@0.2.7
+  sre: tracktor/ci-tools@0.7.2
 
 references:
-  staging_context: &staging_context
-    - docker
   production_context: &production_context
     - docker
     - github
@@ -52,6 +50,7 @@ jobs:
             sudo apt-get update && sudo apt-get install postgresql-client-14
       - sre/run-python-tests:
           extras: '--all-extras --quiet'
+          formatter: 'ruff'
           before-steps:
             - run:
                 name: Initializing DB
@@ -86,6 +85,7 @@ jobs:
     steps:
       - setup_remote_docker:
           version: 20.10.14
+          docker_layer_caching: true
       - checkout
       - attach_workspace:
           at: .
@@ -93,8 +93,8 @@ jobs:
       - sre/build-docker:
           dockerfile: './docker/pg-14/Dockerfile'
           image_name: 'tracktor/padmy'
-          version: ${VERSION}-14
-          latest_version: 'latest-14'
+          tag: ${VERSION}-14
+          latest_tag: 'latest-14'
           publish: true
           registry_pwd: $CONTAINER_REGISTRY_PWD
           registry_user: $CONTAINER_REGISTRY_USER
@@ -104,6 +104,7 @@ jobs:
     steps:
       - setup_remote_docker:
           version: 20.10.14
+          docker_layer_caching: true
       - checkout
       - attach_workspace:
           at: .
@@ -111,8 +112,8 @@ jobs:
       - sre/build-docker:
           dockerfile: './docker/pg-14/Dockerfile'
           image_name: 'tracktor/padmy'
-          version: ${VERSION}-network-14
-          latest_version: 'latest-network-14'
+          tag: ${VERSION}-network-14
+          latest_tag: 'latest-network-14'
           publish: true
           registry_pwd: $CONTAINER_REGISTRY_PWD
           registry_user: $CONTAINER_REGISTRY_USER
@@ -122,6 +123,7 @@ jobs:
     steps:
       - setup_remote_docker:
           version: 20.10.14
+          docker_layer_caching: true
       - checkout
       - attach_workspace:
           at: .
@@ -129,8 +131,8 @@ jobs:
       - sre/build-docker:
           dockerfile: './docker/pg-15/Dockerfile'
           image_name: 'tracktor/padmy'
-          version: ${VERSION}-14
-          latest_version: 'latest-15'
+          tag: ${VERSION}-14
+          latest_tag: 'latest-15'
           publish: true
           registry_pwd: $CONTAINER_REGISTRY_PWD
           registry_user: $CONTAINER_REGISTRY_USER
@@ -140,6 +142,7 @@ jobs:
     steps:
       - setup_remote_docker:
           version: 20.10.14
+          docker_layer_caching: true
       - checkout
       - attach_workspace:
           at: .
@@ -147,8 +150,8 @@ jobs:
       - sre/build-docker:
           dockerfile: './docker/pg-15/Dockerfile'
           image_name: 'tracktor/padmy'
-          version: ${VERSION}-network-14
-          latest_version: 'latest-network-15'
+          tag: ${VERSION}-network-14
+          latest_tag: 'latest-network-15'
           publish: true
           registry_pwd: $CONTAINER_REGISTRY_PWD
           registry_user: $CONTAINER_REGISTRY_USER
@@ -167,14 +170,9 @@ jobs:
           name: Installing deps
           command: |
             poetry install --quiet
-      - run:
-          name: Adding github.com to known hosts
-          command: |
-            mkdir -p ~/.ssh
-            ssh-keyscan github.com >> ~/.ssh/known_hosts
-      - run:
-          name: Create release
-          command: bash .circleci/scripts/release.sh
+      - sre/bump-version:
+          lang: "python"
+          branch: "master"
       - store_artifacts:
           path: dist
       - save_cache:
