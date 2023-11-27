@@ -1,7 +1,7 @@
 FROM python:3.10-alpine
 
 
-RUN apk --no-cache add bash postgresql13-client && \
+RUN apk --no-cache add bash postgresql16-client && \
     addgroup user && \
     adduser -s /bin/bash -D -G user user
 
@@ -19,6 +19,7 @@ RUN chown -R user:user /padmy
 
 ADD ../../run.py .
 ADD ../../padmy padmy/
+
 
 EXPOSE 5555
 

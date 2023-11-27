@@ -12,6 +12,23 @@ references:
     - pypi
     - github
 
+  filters_not_tagged: &filters_not_tagged
+    tags:
+      ignore: /.*/
+
+  filters_only_master: &filters_only_master
+    tags:
+      ignore: /.*/
+    branches:
+      only: /^master$/
+
+  filters_only_tags: &filters_only_tags
+    tags:
+      only: /.*/
+    branches:
+      ignore: /.*/
+
+
 executors:
 
   build-docker:
@@ -131,7 +148,7 @@ jobs:
       - sre/build-docker:
           dockerfile: './docker/pg-15/Dockerfile'
           image_name: 'tracktor/padmy'
-          tag: ${VERSION}-14
+          tag: ${VERSION}-15
           latest_tag: 'latest-15'
           publish: true
           registry_pwd: $CONTAINER_REGISTRY_PWD
@@ -150,8 +167,47 @@ jobs:
       - sre/build-docker:
           dockerfile: './docker/pg-15/Dockerfile'
           image_name: 'tracktor/padmy'
-          tag: ${VERSION}-network-14
+          tag: ${VERSION}-network-15
           latest_tag: 'latest-network-15'
+          publish: true
+          registry_pwd: $CONTAINER_REGISTRY_PWD
+          registry_user: $CONTAINER_REGISTRY_USER
+
+
+  build-publish-docker-16:
+    executor: build-docker
+    steps:
+      - setup_remote_docker:
+          version: 20.10.14
+          docker_layer_caching: true
+      - checkout
+      - attach_workspace:
+          at: .
+      - sre/load-poetry-version
+      - sre/build-docker:
+          dockerfile: './docker/pg-16/Dockerfile'
+          image_name: 'tracktor/padmy'
+          tag: ${VERSION}-16
+          latest_tag: 'latest-16'
+          publish: true
+          registry_pwd: $CONTAINER_REGISTRY_PWD
+          registry_user: $CONTAINER_REGISTRY_USER
+
+  build-publish-docker-network-16:
+    executor: build-docker
+    steps:
+      - setup_remote_docker:
+          version: 20.10.14
+          docker_layer_caching: true
+      - checkout
+      - attach_workspace:
+          at: .
+      - sre/load-poetry-version
+      - sre/build-docker:
+          dockerfile: './docker/pg-16/Dockerfile'
+          image_name: 'tracktor/padmy'
+          tag: ${VERSION}-network-16
+          latest_tag: 'latest-network-16'
           publish: true
           registry_pwd: $CONTAINER_REGISTRY_PWD
           registry_user: $CONTAINER_REGISTRY_USER
@@ -197,56 +253,59 @@ jobs:
 workflows:
 
   run-tests:
-    when:
-      matches:
-        pattern: "^(feat|feature|fix)\\/.*$"
-        value: << pipeline.git.branch >>
     jobs:
-      - run-tests
-
-  production:
-    when:
-      matches:
-        pattern: "^master$"
-        value: << pipeline.git.branch >>
-    jobs:
-      - run-tests
-      - export-requirements
-      - export-requirements-network
-      - build-publish-docker-14:
-          requires: [
-            run-tests,
-            export-requirements
-          ]
-          context: *production_context
-      - build-publish-docker-network-14:
-          requires: [
-            run-tests,
-            export-requirements-network
-          ]
-          context: *production_context
-      - build-publish-docker-15:
-          requires: [
-            run-tests,
-            export-requirements
-          ]
-          context: *production_context
-      - build-publish-docker-network-15:
-          requires: [
-            run-tests,
-            export-requirements-network
-          ]
-          context: *production_context
+      - run-tests:
+          filters: *filters_not_tagged
       - bump-version:
+          filters: *filters_only_master
           context: *production_context
-          requires: [ run-tests ]
+          requires: [
+            run-tests,
+          ]
 
   publish:
     jobs:
       - publish:
           context: *pypi_context
-          filters:
-            tags:
-              only: /.*/
-            branches:
-              ignore: /.*/
+          filters: *filters_only_tags
+
+      - export-requirements:
+          filters: *filters_only_tags
+      - export-requirements-network:
+          filters: *filters_only_tags
+      - build-publish-docker-14:
+          requires: [
+            export-requirements
+          ]
+          context: *production_context
+          filters: *filters_only_tags
+      - build-publish-docker-network-14:
+          requires: [
+            export-requirements-network
+          ]
+          context: *production_context
+          filters: *filters_only_tags
+      - build-publish-docker-15:
+          requires: [
+            export-requirements
+          ]
+          context: *production_context
+          filters: *filters_only_tags
+      - build-publish-docker-network-15:
+          requires: [
+            export-requirements-network
+          ]
+          context: *production_context
+          filters: *filters_only_tags
+      - build-publish-docker-16:
+          requires: [
+            export-requirements
+          ]
+          context: *production_context
+          filters: *filters_only_tags
+      - build-publish-docker-network-16:
+          requires: [
+            export-requirements-network
+          ]
+          context: *production_context
+          filters: *filters_only_tags
