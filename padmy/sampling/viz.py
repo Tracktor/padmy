@@ -36,8 +36,7 @@ class DirectedElement(typing.TypedDict):
 
 def get_directed_edges(g: nx.DiGraph) -> list[DirectedElement]:
     directed_edges: list[DirectedElement] = [
-        {"data": {"id": f"{src}{tgt}", "source": src, "target": tgt}}
-        for src, tgt in g.edges
+        {"data": {"id": f"{src}{tgt}", "source": src, "target": tgt}} for src, tgt in g.edges
     ]
     node_elems: list[DirectedElement] = [{"data": {"id": k, **v}} for k, v in g.nodes.data()]  # type: ignore
     return node_elems + directed_edges
@@ -90,9 +89,7 @@ def get_cycles_styles(g: nx.DiGraph):
 
 
 # See https://dash.plotly.com/cytoscape/layout for a full list
-Layout = Literal[
-    "cose", "breadthfirst", "circle", "preset", "random", "grid", "concentric"
-]
+Layout = Literal["cose", "breadthfirst", "circle", "preset", "random", "grid", "concentric"]
 # needs cyto.load_extra_layouts() to be loaded
 ExternalLayout = Literal["cose-bilkent", "cola", "euler", "spread", "dagre", "klay"]
 
@@ -117,9 +114,7 @@ def get_layout(
         },
         *get_cycles_styles(g),
     ]
-    return cyto.Cytoscape(
-        layout={"name": layout}, style=_style, elements=elements, stylesheet=stylesheet
-    )
+    return cyto.Cytoscape(layout={"name": layout}, style=_style, elements=elements, stylesheet=stylesheet)
 
 
 def run_simple_app(db: Database, port: int = 5555):

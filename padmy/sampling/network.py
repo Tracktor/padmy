@@ -13,9 +13,7 @@ def add_nodes(graph: nx.Graph, table: Table, processed_nodes: set[str]):
     if table.full_name in processed_nodes:
         return
 
-    graph.add_node(
-        table.full_name.replace(".", "_"), count=table.count, label=table.full_name
-    )
+    graph.add_node(table.full_name.replace(".", "_"), count=table.count, label=table.full_name)
 
     processed_nodes.add(table.full_name)
 

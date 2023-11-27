@@ -88,9 +88,7 @@ def get_insert_child_fk_data_query(table: Table, child_table: Table) -> str:
     def _fk_join(tmp_name: str, fk: FKConstraint, fk_index: int) -> str:
         return f"inner join {tmp_name} _s{fk_index} on " + " and ".join(
             f"_s{fk_index}.{column_name} = t.{foreign_column_name}"
-            for column_name, foreign_column_name in zip(
-                fk.column_names, fk.foreign_column_names
-            )
+            for column_name, foreign_column_name in zip(fk.column_names, fk.foreign_column_names)
         )
 
     for i, _fk in enumerate(child_table.foreign_keys):
@@ -111,9 +109,7 @@ def get_insert_child_fk_data_query(table: Table, child_table: Table) -> str:
 
 
 def get_insert_data_query(table: Table):
-    where_str = "and ".join(
-        f"t2.{_pk.column_name} = t1.{_pk.column_name}" for _pk in table.primary_keys
-    )
+    where_str = "and ".join(f"t2.{_pk.column_name} = t1.{_pk.column_name}" for _pk in table.primary_keys)
     query = f"""
     INSERT into {table.tmp_name} ({table.values})
     SELECT {table.values} from {table.full_name} t1
@@ -146,9 +142,7 @@ async def _insert_node_table(conn: asyncpg.Connection, table: Table, table_size:
         logs.debug(f"Insert child data query: {query}")
         await conn.execute(query)
 
-    count = cast(
-        int | None, await conn.fetchval(f"SELECT count(*) from {table.tmp_name}")
-    )
+    count = cast(int | None, await conn.fetchval(f"SELECT count(*) from {table.tmp_name}"))
     if count is None:
         raise NotImplementedError("Got empty table")
 
@@ -159,18 +153,12 @@ async def _insert_node_table(conn: asyncpg.Connection, table: Table, table_size:
         case count if count < table_size:
             query = get_insert_data_query(table)
             _limit = table_size - count
-            logs.debug(
-                f"Got {count} < {table_size}, inserting data: {query.replace('$1', str(_limit))}"
-            )
+            logs.debug(f"Got {count} < {table_size}, inserting data: {query.replace('$1', str(_limit))}")
             await conn.execute(query, _limit)
         case count if count > table_size:
-            logs.warning(
-                f"Sample size cannot be reached (got {count}, expected {table_size})"
-            )
+            logs.warning(f"Sample size cannot be reached (got {count}, expected {table_size})")
         case _:
-            raise NotImplementedError(
-                f"Got invalid count: {count} (table_size: {table_size})"
-            )
+            raise NotImplementedError(f"Got invalid count: {count} (table_size: {table_size})")
 
 
 async def process_table(table: Table, conn: asyncpg.Connection) -> set[Table]:
@@ -198,19 +186,11 @@ async def process_table(table: Table, conn: asyncpg.Connection) -> set[Table]:
             await _insert_node_table(conn, table, table_size)
         else:
             logs.debug("\tWaiting for children to be processed")
-            return {
-                _child_table
-                for _child_table in table.child_tables_safe
-                if not _child_table.has_been_processed
-            }
+            return {_child_table for _child_table in table.child_tables_safe if not _child_table.has_been_processed}
 
     table.has_been_processed = True
 
-    return {
-        _parent_table
-        for _parent_table in table.parent_tables_safe
-        if not _parent_table.has_been_processed
-    }
+    return {_parent_table for _parent_table in table.parent_tables_safe if not _parent_table.has_been_processed}
 
 
 @contextlib.asynccontextmanager
@@ -240,10 +220,7 @@ async def create_temp_tables(
 
     # We start from the nodes
     _tables = set(
-        table
-        for table in tables
-        if (table.is_root if start_from == "node" else table.is_leaf)
-        and not table.ignore
+        table for table in tables if (table.is_root if start_from == "node" else table.is_leaf) and not table.ignore
     )
 
     if not _tables:
@@ -260,9 +237,7 @@ async def create_temp_tables(
 
         # To avoid infinite loop
         if _tables == _parent_tables:
-            _not_processed = [
-                _table for _table in tables if not _table.children_has_been_processed
-            ]
+            _not_processed = [_table for _table in tables if not _table.children_has_been_processed]
 
             for _table in _not_processed:
                 logs.error(_table.full_name)
@@ -301,9 +276,7 @@ async def sample_database(
         await create_temp_tables(conn, db.tables)
 
         # Safety check
-        _not_processed_tables = [
-            x.full_name for x in db.tables if not x.has_been_processed
-        ]
+        _not_processed_tables = [x.full_name for x in db.tables if not x.has_been_processed]
         if _not_processed_tables:
             raise NotImplementedError(
                 f"Found {len(_not_processed_tables)} tables that has not been "
@@ -322,14 +295,8 @@ async def sample_database(
         logs.info("Done creating temporary tables, inserting to new database.")
         async with disable_trigger(target_conn, active=no_trigger):
             with Progress(disable=not show_progress) as progress:
-                task1 = progress.add_task(
-                    "[green]Inserting tables....", total=len(db.tables)
-                )
-                task2 = (
-                    progress.add_task("[purple]Inserting chunks....")
-                    if show_progress
-                    else None
-                )
+                task1 = progress.add_task("[green]Inserting tables....", total=len(db.tables))
+                task2 = progress.add_task("[purple]Inserting chunks....") if show_progress else None
                 for table in db.tables:
                     logs.debug(f"Inserting to {table.full_name}")
                     if task2 is not None:

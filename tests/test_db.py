@@ -142,9 +142,7 @@ _FKS_PARAMS = [
 
 
 @pytest.mark.usefixtures("setup_tmp_schema")
-@pytest.mark.parametrize(
-    "name, query, expected", _FKS_PARAMS, ids=[x[0] for x in _FKS_PARAMS]
-)
+@pytest.mark.parametrize("name, query, expected", _FKS_PARAMS, ids=[x[0] for x in _FKS_PARAMS])
 def test_load_fk_constraints(name, query, expected, aengine, engine, loop):
     from padmy.db import FKConstraint, load_foreign_keys
 
@@ -192,9 +190,7 @@ _PKS_PARAMS = [
 
 
 @pytest.mark.usefixtures("setup_tmp_schema")
-@pytest.mark.parametrize(
-    "name, table, expected", _PKS_PARAMS, ids=[x[0] for x in _PKS_PARAMS]
-)
+@pytest.mark.parametrize("name, table, expected", _PKS_PARAMS, ids=[x[0] for x in _PKS_PARAMS])
 def test_load_pk_constraints(name, table, expected, aengine, engine, loop):
     from padmy.db import PKConstraint, load_primary_keys
 
@@ -293,17 +289,13 @@ def test_explore(loop, apool):
     assert len(table_1.parent_tables) == 0
     assert len(table_1.parent_tables_safe) == 0
     # Circular
-    single_circular = [x for x in db.tables if x.full_name == "public.single_circular"][
-        0
-    ]
+    single_circular = [x for x in db.tables if x.full_name == "public.single_circular"][0]
 
     assert len(single_circular.child_tables) == 1
     assert len(single_circular.child_tables_safe) == 0
     assert not single_circular.has_children
     # Schema
-    table_multi_schema_1 = [
-        x for x in db.tables if x.full_name == "public.multi_schema_1"
-    ][0]
+    table_multi_schema_1 = [x for x in db.tables if x.full_name == "public.multi_schema_1"][0]
     assert len(table_multi_schema_1.child_tables) == 1
     assert len(table_multi_schema_1.child_tables_safe) == 1
     assert table_multi_schema_1.has_children

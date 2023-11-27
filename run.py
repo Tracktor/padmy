@@ -24,9 +24,7 @@ cli.add_command_group(migration)
 
 
 def on_process(verbose: bool = False, verbose2: bool = False):
-    setup_logging(
-        logging.DEBUG if verbose2 else logging.INFO if verbose else logging.WARNING
-    )
+    setup_logging(logging.DEBUG if verbose2 else logging.INFO if verbose else logging.WARNING)
 
 
 cli.set_options_processor(on_process)
@@ -44,9 +42,7 @@ async def get_explored_db(pg_url: str, db_name: str, schemas: list[str]):
 async def ano_main(
     pg_url: str = Derived(get_pg_root),
     db_name: str = Option(..., "--db", help="Database to anonymize"),
-    config_path: Path = Option(
-        ..., "-f", "--file", help="Path to the configuration file"
-    ),
+    config_path: Path = Option(..., "-f", "--file", help="Path to the configuration file"),
 ):
     config = Config.load_from_file(config_path)
     faker = Faker()
@@ -60,8 +56,7 @@ async def sample_main(
     to_db: str = Option(..., "--db-to", help="Database to migrate to"),
     schemas: list[str] | None = Option(None, "--schemas", help="Schemas to samples"),
     sample: int | None = Option(None, "--sample", help="Sample size"),
-    config_path: Path
-    | None = Option(None, "-f", "--file", help="Path to the configuration file"),
+    config_path: Path | None = Option(None, "-f", "--file", help="Path to the configuration file"),
     copy_db: bool = Option(False, "--copy-db", help="Copy database before sampling"),
     # pg_url: str = Derived(get_pg_root),
     pg_from: str = Derived(get_pg_root_from("from")),
@@ -77,9 +72,7 @@ async def sample_main(
     elif sample is not None and schemas is not None:
         config = Config.load(sample, schemas=schemas)
     else:
-        raise NotImplementedError(
-            "Please specify either a sample size and schemas or a config path"
-        )
+        raise NotImplementedError("Please specify either a sample size and schemas or a config path")
 
     _schemas = [x.schema for x in config.schemas]
     if copy_db:
@@ -149,9 +142,7 @@ async def analyze_main(
     db_name: str = Option(..., "--db", help="Database to explore"),
     pg_url: str = Derived(get_pg_root),
     schemas: list[str] = Option(..., "--schemas", help="Schemas to analyze"),
-    show_graphs: bool = Option(
-        False, "--show-graphs", help="Show graphs of the database"
-    ),
+    show_graphs: bool = Option(False, "--show-graphs", help="Show graphs of the database"),
     port: int = Option(5555, "--graph-port", help="Port for the graph"),
 ):
     """

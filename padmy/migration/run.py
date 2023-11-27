@@ -15,16 +15,10 @@ If it's the first time running theses scripts please run
 **`poetry run cli migrate setup`** to setup the database's table
 """
 
-migration = CommandGroup(
-    "migrate", help="Migration utilities", description=MIGRATION_DESCRIPTION
-)
+migration = CommandGroup("migrate", help="Migration utilities", description=MIGRATION_DESCRIPTION)
 
-MigrationDir = Option(
-    MIGRATION_DIR or ..., "--sql-dir", help="Directory containing the migration files"
-)
-SQLDir = Option(
-    SQL_DIR or ..., "--sql-dir", help="Directory containing the table definitions"
-)
+MigrationDir = Option(MIGRATION_DIR or ..., "--sql-dir", help="Directory containing the migration files")
+SQLDir = Option(SQL_DIR or ..., "--sql-dir", help="Directory containing the table definitions")
 
 
 @migration.command(cmd="new-sql")
@@ -72,9 +66,7 @@ def new_migrate_file(migration_folder: Path = MigrationDir):
 async def migrate_up_main(
     pg_conn: Connection = Derived(get_pg),
     sql_dir: Path = MigrationDir,
-    nb_migrations: int = Option(
-        1, "-n", "--nb-migrations", help="Number of migrations to apply"
-    ),
+    nb_migrations: int = Option(1, "-n", "--nb-migrations", help="Number of migrations to apply"),
 ):
     from .migration import migrate_up, NoSetupTableError
 
@@ -88,9 +80,7 @@ async def migrate_up_main(
 async def migrate_down_main(
     conn: Connection = Derived(get_pg),
     sql_dir: Path = MigrationDir,
-    nb_rollbacks: int = Option(
-        1, "-n", "--nb-rollbacks", help="Number of rollbacks to apply"
-    ),
+    nb_rollbacks: int = Option(1, "-n", "--nb-rollbacks", help="Number of rollbacks to apply"),
 ):
     from .migration import migrate_down, NoSetupTableError
 
@@ -100,9 +90,7 @@ async def migrate_down_main(
         logs.critical(e, exc_info=False)
 
 
-@migration.command(
-    cmd="setup", help="Create the tables that will contain the migration metadata"
-)
+@migration.command(cmd="setup", help="Create the tables that will contain the migration metadata")
 async def migrate_setup_main(pg_conn: Connection = Derived(get_pg)):
     from .migration import migrate_setup
 
@@ -116,9 +104,7 @@ def migrate_verify_main(
     pg_port: int = PgPort,
     pg_user: str = PgUser,
     pg_password: Password = PgPassword,
-    schemas: list[str] = Option(
-        ..., "--schemas", help="Schemas impacted by the migration"
-    ),
+    schemas: list[str] = Option(..., "--schemas", help="Schemas impacted by the migration"),
     sql_dir: Path = MigrationDir,
 ):
     os.environ["PG_HOST"] = pg_host

@@ -88,20 +88,12 @@ class Table:
     @property
     def parent_tables_safe(self):
         # return self.parent_tables - {self}
-        return {
-            x
-            for x in self.parent_tables
-            if x.full_name != self.full_name and not x.ignore
-        }
+        return {x for x in self.parent_tables if x.full_name != self.full_name and not x.ignore}
 
     @property
     def child_tables_safe(self):
         # Returns the child table that are not the current table
-        return {
-            x
-            for x in self.child_tables
-            if x.full_name != self.full_name and not x.ignore
-        }
+        return {x for x in self.child_tables if x.full_name != self.full_name and not x.ignore}
 
     @property
     def full_name(self):
@@ -137,9 +129,7 @@ class Table:
         if self.columns is None:
             raise ValueError("Columns must be loaded first")
         _table = f"{table}." if table is not None else ""
-        return ", ".join(
-            sorted([f'{_table}"{x.name}"' for x in self.columns if not x.is_generated])
-        )
+        return ", ".join(sorted([f'{_table}"{x.name}"' for x in self.columns if not x.is_generated]))
 
     @property
     def values(self):
@@ -195,9 +185,7 @@ async def get_tables(conn: asyncpg.Connection, schemas: list[str]):
     return [Table(**x) for x in data]
 
 
-async def get_columns(
-    conn: asyncpg.Connection, tables: list[Table]
-) -> dict[str, list[Column]]:
+async def get_columns(conn: asyncpg.Connection, tables: list[Table]) -> dict[str, list[Column]]:
     query = """
     SELECT full_name,
            JSON_AGG(
@@ -285,13 +273,9 @@ WHERE table_schema = $1 AND
 """
 
 
-async def load_columns_type(
-    conn: asyncpg.Connection, schema: str, table: str, columns: list[str]
-):
+async def load_columns_type(conn: asyncpg.Connection, schema: str, table: str, columns: list[str]):
     data = await conn.fetch(GET_COLUMNS_TYPE_QUERY, schema, table, columns)
-    return functools.reduce(
-        lambda p, n: {**p, **{n["column_name"]: n["data_type"]}}, data, {}
-    )
+    return functools.reduce(lambda p, n: {**p, **{n["column_name"]: n["data_type"]}}, data, {})
 
 
 @dataclass
@@ -339,9 +323,7 @@ class Database:
 
         if load_count:
             logs.info("Counting number of rows in tables...")
-            await asyncio.gather(
-                *[get_conn(pool, table.load_count) for table in self.tables]
-            )
+            await asyncio.gather(*[get_conn(pool, table.load_count) for table in self.tables])
 
     def load_config(self, config: Config):
         """
@@ -351,12 +333,8 @@ class Database:
         if not self.tables:
             raise ValueError("Tables must be loaded first")
 
-        _schemas: dict[str, ConfigSchema] = {
-            schema.schema: schema for schema in config.schemas
-        }
-        _tables: dict[str, ConfigTable] = {
-            f"{_table.schema}.{_table.table}": _table for _table in config.tables
-        }
+        _schemas: dict[str, ConfigSchema] = {schema.schema: schema for schema in config.schemas}
+        _tables: dict[str, ConfigTable] = {f"{_table.schema}.{_table.table}": _table for _table in config.tables}
         for _table in self.tables:
             _config_schema = _schemas.get(_table.schema)
             _config_table = _tables.get(_table.full_name)
@@ -403,23 +381,17 @@ def pprint_compared_dbs(db_1: Database, db_2: Database):
     table.add_column(f"Count {db_2.name!r}", justify="right", style="cyan")
     table.add_column("Diff", justify="right", style="green")
 
-    tables_1, tables_2 = sorted(db_1.tables, key=lambda x: x.full_name), sorted(
-        db_2.tables, key=lambda x: x.full_name
-    )
+    tables_1, tables_2 = sorted(db_1.tables, key=lambda x: x.full_name), sorted(db_2.tables, key=lambda x: x.full_name)
 
     for _table1, _table2 in zip(tables_1, tables_2):
-        perc_diff = (
-            100 if _table2.count == 0 else int(_table2.count * 100 / _table1.count)
-        )
+        perc_diff = 100 if _table2.count == 0 else int(_table2.count * 100 / _table1.count)
         if perc_diff > 0:
             pass
         elif perc_diff < 0:
             pass
         else:
             pass
-        table.add_row(
-            _table1.full_name, str(_table1.count), str(_table2.count), f"{perc_diff}%"
-        )
+        table.add_row(_table1.full_name, str(_table1.count), str(_table2.count), f"{perc_diff}%")
 
     console = Console()
     console.print(table)

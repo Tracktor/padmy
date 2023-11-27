@@ -73,9 +73,7 @@ def test_sample_db_circular_single(loop, aengine):
             foreign_column_names=["id"],
         )
     ]
-    table = Table(
-        schema="public", table="single_circular", foreign_keys=fks, sample_size=20
-    )
+    table = Table(schema="public", table="single_circular", foreign_keys=fks, sample_size=20)
 
     async def test():
         await table.load_count(aengine)
@@ -247,9 +245,7 @@ def setup_3_simple_tables(engine, sample_engine):
                 "tmptest.table_2": 0,
             },
             {
-                "_tmptest_table_1_tmp": [
-                    {"id": i, "foo": f"foo-{i}"} for i in range(10)
-                ],
+                "_tmptest_table_1_tmp": [{"id": i, "foo": f"foo-{i}"} for i in range(10)],
                 "_tmptest_table_2_tmp": [],
             },
             id="2 tables, No data child",
