@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: 'v3.11.0'
+    rev: 'v3.13.0'
     hooks:
       - id: commitizen
   - repo: https://github.com/astral-sh/ruff-pre-commit
