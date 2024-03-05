@@ -10,6 +10,7 @@ import pytest
 from psycopg.errors import DuplicateDatabase
 from tracktolib.pg_sync import get_tables, clean_tables, insert_many
 from typing_extensions import LiteralString
+import tempfile
 
 PG_HOST = os.getenv("PG_HOST", "localhost")
 PG_PORT = int(os.getenv("PG_PORT", "5432"))
@@ -29,6 +30,9 @@ def set_envs():
     os.environ["PG_PASSWORD"] = PG_PASSWORD
     os.environ["PG_USER"] = PG_USER
     logs.setLevel(logging.ERROR)
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        os.environ["PADMY_FOLDER"] = str(Path(tmpdirname) / ".padmy")
+        yield
 
 
 @pytest.fixture(scope="session")

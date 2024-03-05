@@ -5,16 +5,16 @@ from dataclasses import dataclass, field
 import asyncpg
 from rich.console import Console
 from rich.table import Table as RTable
-from typing_extensions import Self
 
 from padmy.config import Config, ConfigTable, ConfigSchema
 from padmy.logs import logs
 from padmy.utils import get_first, get_conn
+import sys
 
-
-# if sys.version_info.minor < 11 and sys.version_info.major >= 3:
-# else:
-#     from typing import Self
+if sys.version_info < (3, 11):
+    from typing_extensions import Self
+else:
+    from typing import Self
 
 
 def _get_full_name(schema: str | None, table: str | None) -> str:
@@ -146,14 +146,11 @@ class Table:
     async def load_count(self, conn: asyncpg.Connection):
         self._count = await conn.fetchval(f"SELECT count(*) from {self.full_name}")
 
-    def __eq__(self, other: Self):
-        for k in ["full_name", "has_been_processed"]:
-            if getattr(self, k) != getattr(other, k):
-                return False
-        return True
+    def __eq__(self, other: object):
+        return self.__hash__() == other.__hash__()
 
     def __hash__(self):
-        return hash((getattr(self, x) for x in ["full_name"]))
+        return hash((self.full_name, self.has_been_processed))
 
     def __repr__(self):
         return (

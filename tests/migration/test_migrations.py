@@ -52,7 +52,7 @@ def test_create_new_migration(monkeypatch, migration_dir, capsys):
     up_content = [x.rstrip() for x in up_file2.open().readlines() if x.strip()]
     assert up_content == [f"-- Prev-file: {up_file.name}", f"-- Author: {TEST_EMAIL}"]
     down_content = [x.rstrip() for x in down_file2.open().readlines() if x.strip()]
-    assert down_content == [f"-- Prev-file: {up_file.name}", f"-- Author: {TEST_EMAIL}"]
+    assert down_content == [f"-- Prev-file: {down_file.name}", f"-- Author: {TEST_EMAIL}"]
 
 
 @pytest.mark.usefixtures("clean_migration")

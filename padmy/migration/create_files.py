@@ -8,14 +8,17 @@ from rich.markup import escape
 from rich.prompt import Prompt
 
 from padmy.logs import logs
-from .utils import get_git_email, get_files, iter_migration_files
+from .utils import get_files, iter_migration_files
+from .config import MigrationConfig
 
 _CONSOLE = Console(markup=True, highlight=False)
 
 
 def _get_user_email() -> str | None:
-    default_author = get_git_email()
-    author = Prompt.ask("[blue]Author[/blue]", default=default_author, console=_CONSOLE)
+    _config = MigrationConfig.load()
+    author = Prompt.ask("[blue]Author[/blue]", default=_config.author, console=_CONSOLE)
+    _config.author = author
+    _config.save()
     return author
 
 
@@ -53,6 +56,6 @@ def create_new_migration(folder: Path):
     ).strip()
 
     up_file.write_text(file_header)
-    down_file.write_text(file_header)
+    down_file.write_text(file_header.replace("-up", "-down"))
 
     _CONSOLE.print("\nNew files created!\n")
