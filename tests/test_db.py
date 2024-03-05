@@ -310,7 +310,6 @@ def test_table_hash():
     t3 = Table("public", "table_3")
     t1 = Table("public", "table_1")
     t1.child_tables = {t1, t2, t3}
-    print([x.__hash__() for x in t1.child_tables])
     z = {t1, t2, t3} - {t1}
 
     assert z == {t2, t3}
