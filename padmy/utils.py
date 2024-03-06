@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from piou import Option, Derived, Password
 from typing import Sequence, AsyncIterator, Callable, TypeVar, cast, Literal
+from functools import partial
 
 from padmy import env
 from .env import PG_HOST, PG_PORT, PG_USER, PG_DATABASE, PG_PASSWORD
@@ -39,11 +40,14 @@ async def get_pg(pg_url: str = Derived(get_pg_url)):
     return await asyncpg.connect(pg_url)
 
 
+OnStdErrorFn = Callable[[str], None]
+
+
 def exec_cmd(
     cmd: Sequence[str | int],
     env: dict | None = None,
     *,
-    on_stderr: Callable | None = None,
+    on_stderr: OnStdErrorFn | None = None,
 ) -> str:
     _cmd = cmd if isinstance(cmd, str) else " ".join(str(x) for x in cmd)
     logs.debug(f"Executing cmd: {_cmd}")
@@ -52,9 +56,10 @@ def exec_cmd(
     ).communicate()
     if stderr:
         _msg = stderr.decode("utf-8")
-        logs.warning(_msg)
-        if on_stderr:
+        if on_stderr is not None:
             on_stderr(_msg)
+        else:
+            logs.warning(_msg)
     return stdout.decode("utf-8")
 
 
@@ -89,9 +94,21 @@ def get_pg_envs():
     }
 
 
-def _on_pg_error(msg: str):
-    if "error" in msg or "fatal" in msg:
-        raise ValueError(msg)
+class PGError(Exception):
+    def __init__(self, msg: str, cmd: str | None = None):
+        super().__init__(msg)
+        self.cmd = cmd
+        self.errors = extract_pg_error(msg)
+
+    @property
+    def msg_fmt(self):
+        return "=== ERROR ====\n\n" + "\n\n=== ERROR ====\n\n".join(self.errors)
+
+
+def _on_pg_error(msg: str, cmd: list[str] | str):
+    if "ERROR" in msg or "FATAL" in msg:
+        _cmd = cmd if isinstance(cmd, str) else " ".join(str(x) for x in cmd)
+        raise PGError(msg, cmd=_cmd)
 
 
 def _get_conn_infos(
@@ -118,6 +135,7 @@ def pg_dump(
     password: str | None = None,
     host: str | None = None,
     port: int | None = None,
+    on_stderr: OnStdErrorFn | None = None,
 ):
     _schemas = "|".join(x for x in schemas)
     cmd = [
@@ -131,7 +149,8 @@ def pg_dump(
         cmd += options
 
     cmd += [">", dump_path]
-    exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_pg_error)
+    _on_stderr = on_stderr or partial(_on_pg_error, cmd=cmd)
+    exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_stderr)
 
 
 def pg_restore(
@@ -143,11 +162,13 @@ def pg_restore(
     password: str | None = None,
     host: str | None = None,
     port: int | None = None,
+    on_stderr: OnStdErrorFn | None = None,
 ):
     cmd = [_COMMANDS["pg_restore"], "-d", database, dump_path] + _get_conn_infos(user, password, host, port)
     if options is not None:
         cmd += options
-    exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_pg_error)
+    _on_stderr = on_stderr or partial(_on_pg_error, cmd=cmd)
+    exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_stderr)
 
 
 def create_db(
@@ -157,9 +178,11 @@ def create_db(
     password: str | None = None,
     host: str | None = None,
     port: int | None = None,
+    on_stderr: OnStdErrorFn | None = None,
 ):
     cmd = [_COMMANDS["createdb"], database] + _get_conn_infos(user, password, host, port)
-    exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_pg_error)
+    _on_stderr = on_stderr or partial(_on_pg_error, cmd=cmd)
+    exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_stderr)
 
 
 def drop_db(
@@ -170,13 +193,15 @@ def drop_db(
     password: str | None = None,
     host: str | None = None,
     port: int | None = None,
+    on_stderr: OnStdErrorFn | None = None,
 ):
     cmd = [_COMMANDS["dropdb"]] + _get_conn_infos(user, password, host, port)
 
     if if_exists:
         cmd.append("--if-exists")
     cmd.append(database)
-    exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_pg_error)
+    _on_stderr = on_stderr or partial(_on_pg_error, cmd=cmd)
+    exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_stderr)
 
 
 def exec_psql_file(
@@ -187,9 +212,11 @@ def exec_psql_file(
     password: str | None = None,
     host: str | None = None,
     port: int | None = None,
+    on_stderr: OnStdErrorFn | None = None,
 ):
     cmd = [_COMMANDS["psql"], "-f", sql_file, "-d", database] + _get_conn_infos(user, password, host, port)
-    exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_pg_error)
+    _on_stderr = on_stderr or partial(_on_pg_error, cmd=cmd)
+    exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_stderr)
 
 
 def exec_psql(
@@ -200,9 +227,11 @@ def exec_psql(
     password: str | None = None,
     host: str | None = None,
     port: int | None = None,
+    on_stderr: OnStdErrorFn | None = None,
 ):
     cmd = [_COMMANDS["psql"], "-c", f"'{query}'", "-d", database] + _get_conn_infos(user, password, host, port)
-    exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_pg_error)
+    _on_stderr = on_stderr or partial(_on_pg_error, cmd=cmd)
+    exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_stderr)
 
 
 async def exec_file(conn: asyncpg.Connection, file: Path):
@@ -348,3 +377,37 @@ def temp_env(new_env: dict):
 async def init_connection(conn: asyncpg.Connection):
     await conn.set_type_codec("jsonb", encoder=json.dumps, decoder=json.loads, schema="pg_catalog")
     await conn.set_type_codec("json", encoder=json.dumps, decoder=json.loads, schema="pg_catalog")
+
+
+_IS_ERROR_REG = re.compile(r".*(?P<error_type>ERROR|FATAL):(?P<msg>.*)")
+_IS_INFO_REG = re.compile(r".*NOTICE:(?P<msg>.*)")
+_CLEAN_STR_REG = re.compile(r"^E\s+|\s{2,}", flags=re.MULTILINE)
+
+
+def _clean_str(msg: str) -> str:
+    return _CLEAN_STR_REG.sub(" ", msg).strip()
+
+
+def extract_pg_error(msg: str) -> list[str]:
+    """
+    Extracts the errors from a pg error message
+    """
+    errors = []
+    current_error = None
+    for line in msg.splitlines():
+        if _match_error := _IS_ERROR_REG.match(line):
+            if current_error is not None:
+                errors.append(_clean_str(current_error))
+            current_error = f"{_match_error.group('error_type')}: {_match_error.group('msg')}"
+        elif _match_info := _IS_INFO_REG.match(line):
+            if current_error is not None:
+                errors.append(_clean_str(current_error))
+            current_error = None
+        else:
+            if current_error is not None:
+                current_error += f"\n{_clean_str(line)}"
+
+    if current_error is not None:
+        errors.append(_clean_str(current_error))
+
+    return errors
