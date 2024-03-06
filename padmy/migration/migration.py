@@ -57,10 +57,10 @@ def _verify_migration(
         options=["-E", "utf8", "--schema-only"],
     )
 
-    logs.debug(f"Applying {up_file.name}")
+    logs.info(f"Applying {up_file.name}")
     exec_psql_file(database, str(up_file))
 
-    logs.debug(f"Applying {down_file.name}")
+    logs.info(f"Applying {down_file.name}")
     exec_psql_file(database, str(down_file))
 
     # Dump after
@@ -106,6 +106,7 @@ def migrate_verify(
     _down_files: list[MigrationFile] = []
     try:
         for i, (_up_file, _down_file) in enumerate(iter_migration_files(migration_files)):
+            logs.info(f"Checking migration {i + 1}/{int(len(migration_files) / 2)}")
             _verify_migration(
                 database=database,
                 schemas=schemas,
