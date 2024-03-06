@@ -97,6 +97,7 @@ def get_pg_envs():
 class PGError(Exception):
     def __init__(self, msg: str, cmd: str | None = None):
         super().__init__(msg)
+        self.msg = msg
         self.cmd = cmd
         self.errors = extract_pg_error(msg)
 
