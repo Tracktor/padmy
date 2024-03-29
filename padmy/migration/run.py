@@ -5,7 +5,7 @@ from pathlib import Path
 from asyncpg import Connection
 from piou import Option, Derived, CommandGroup, Password, CommandError
 
-from padmy.env import SQL_DIR, MIGRATION_DIR
+from padmy.env import SQL_DIR, MIGRATION_DIR, CONSOLE
 from padmy.logs import logs
 from padmy.utils import get_pg, PgHost, PgPort, PgUser, PgDatabase, PgPassword
 
@@ -139,3 +139,5 @@ def verify_files(
     has_errors = verify_migration_files(sql_dir, raise_error=not no_raise_error)
     if has_errors:
         raise CommandError("Files are not correctly ordered")
+    else:
+        CONSOLE.print("[green]Files are correctly ordered[/green]")
