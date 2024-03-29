@@ -4,7 +4,8 @@ from pathlib import Path
 from psycopg.errors import DuplicateDatabase
 import deepdiff
 import psycopg
-from typing import cast, LiteralString
+from typing_extensions import LiteralString
+from typing import cast
 
 
 def pprint_dataclass_diff(d1, d2):
