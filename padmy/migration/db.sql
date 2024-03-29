@@ -24,3 +24,6 @@ CREATE TABLE IF NOT EXISTS public.migration
     file_ts        TIMESTAMP          NOT NULL,
     file_id        varchar(10)        NOT NULL
 );
+
+ALTER TABLE public.migration
+    ADD COLUMN IF NOT EXISTS meta JSONB;

@@ -157,13 +157,14 @@ def test_migrate_up_down(engine, monkeypatch, caplog, aengine, loop):
     assert len(data) == 0
 
     # 1rst migration
-    loop.run_until_complete(migrate_up(aengine, folder=VALID_MIGRATIONS_DIR, nb_migrations=1))
+    loop.run_until_complete(migrate_up(aengine, folder=VALID_MIGRATIONS_DIR, nb_migrations=1, metadata={"foo": "bar"}))
 
     assert check_table_exists(engine, "general", "test")
     assert check_table_exists(engine, "general", "test2")
     assert not check_column_exists(engine, "general", "test", "baz")
     data = fetch_all(engine, "SELECT * FROM public.migration")
     assert len(data) == 1
+    assert data[0]["meta"] == {"foo": "bar"}
     data = data[0]
     assert data.pop("applied_at")
     assert data.pop("id") is not None
@@ -187,14 +188,16 @@ def test_migrate_up_down(engine, monkeypatch, caplog, aengine, loop):
     assert messages[-1] == "No migrations to apply"
 
     # Migrate down
-    loop.run_until_complete(migrate_down(aengine, folder=VALID_MIGRATIONS_DIR, nb_migrations=1))
+    loop.run_until_complete(
+        migrate_down(aengine, folder=VALID_MIGRATIONS_DIR, nb_migrations=1, metadata={"bar": "baz"})
+    )
     assert check_table_exists(engine, "general", "test")
     assert check_table_exists(engine, "general", "test2")
     assert not check_table_exists(engine, "general", "baz")
     data = fetch_all(engine, "SELECT * FROM public.migration ORDER BY applied_at DESC")
     assert len(data) == 3
     assert data[0]["migration_type"] == "down"
-
+    assert data[0]["meta"] == {"bar": "baz"}
     # Migrate down a second time
     loop.run_until_complete(migrate_down(aengine, folder=VALID_MIGRATIONS_DIR, nb_migrations=1))
     assert not check_table_exists(engine, "general", "test")
