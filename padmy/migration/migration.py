@@ -125,7 +125,8 @@ def migrate_verify(
 
     # Restoring to initial state
     logs.info("Restoring to initial state")
-    for _down_file in reversed(_down_files):
+    for i, _down_file in enumerate(reversed(_down_files)):
+        logs.info(f"Applying {_down_file.path.name} ({len(_down_files) - i}/{len(_down_files)})")
         exec_psql_file(database, str(_down_file.path))
     # else:
     #     if last_down_file:

@@ -179,6 +179,16 @@ poetry run cli -vv migrate verify --sql-dir /tmp/migrations
 
 We are all good !
 
+## 4. Comparing databases schemas
+
+You can compare two databases by running:
+
+```bash
+poetry run cli -vv schema-diff --db tracktor --schemas schema_1,schema_2
+```
+If differences are found, the command will output the differences between the two databases.
+
+
 ### Known limitations
 
 **Exact sample size**

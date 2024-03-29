@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import sys
+import tempfile
 from pathlib import Path
 
 import asyncpg
@@ -13,7 +14,8 @@ from padmy.db import pretty_print_stats, pprint_compared_dbs, Database
 from padmy.logs import setup_logging, logs
 from padmy.migration import migration
 from padmy.sampling import sample_database, copy_database
-from padmy.utils import get_pg_root, get_pg_root_from, init_connection
+from padmy.utils import get_pg_root, get_pg_root_from, init_connection, check_cmd
+from padmy.env import CONSOLE
 
 cli = Cli("Padmy utility commands")
 
@@ -104,8 +106,6 @@ async def sample_main(
         await sample_database(conn, target_conn, db, show_progress=progress)
     except Exception as e:
         raise e
-        logs.error(e)
-        sys.exit(1)
     finally:
         await asyncio.wait_for(conn.close(), timeout=1)
         await asyncio.wait_for(target_conn.close(), timeout=1)
@@ -176,6 +176,35 @@ async def compare_db_main(
     )
 
     pprint_compared_dbs(db1, db2)
+
+
+@cli.command(cmd="schema-diff", help="Compare the schemas of 2 databases")
+def schema_diff(
+    pg_from: str = Derived(get_pg_root_from("from")),
+    pg_to: str = Derived(get_pg_root_from("to")),
+    database: str = Option(..., "--db", help="Database to compare"),
+    schemas: list[str] = Option(..., "--schemas", help="Schemas to analyze"),
+    no_privileges: bool = Option(False, "-x", "--no-privileges", help="Exclude privileges from the dump"),
+):
+    from padmy.compare import compare_databases
+
+    for cmd in ["pg_dump"]:
+        check_cmd(cmd)
+    with tempfile.TemporaryDirectory() as dump_dir:
+        _dump_dir = Path(dump_dir)
+        diff = compare_databases(
+            pg_from,
+            to_pg_url=pg_to,
+            schemas=schemas,
+            database=database,
+            dump_dir=_dump_dir,
+            no_privileges=no_privileges,
+        )
+    if diff is not None:
+        CONSOLE.print("[orange]Differences found[/orange]")
+        CONSOLE.print("\n".join(diff))
+    else:
+        CONSOLE.print("[green]No differences found[/green]")
 
 
 def run():

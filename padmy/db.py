@@ -3,12 +3,12 @@ import functools
 from dataclasses import dataclass, field
 
 import asyncpg
-from rich.console import Console
 from rich.table import Table as RTable
 
 from padmy.config import Config, ConfigTable, ConfigSchema
 from padmy.logs import logs
 from padmy.utils import get_first, get_conn
+from padmy.env import CONSOLE
 import sys
 
 if sys.version_info < (3, 11):
@@ -366,8 +366,7 @@ def pretty_print_stats(database: Database):
             str(len(_table.child_tables)),
         )
 
-    console = Console()
-    console.print(table)
+    CONSOLE.print(table)
 
 
 def pprint_compared_dbs(db_1: Database, db_2: Database):
@@ -390,5 +389,4 @@ def pprint_compared_dbs(db_1: Database, db_2: Database):
             pass
         table.add_row(_table1.full_name, str(_table1.count), str(_table2.count), f"{perc_diff}%")
 
-    console = Console()
-    console.print(table)
+    CONSOLE.print(table)

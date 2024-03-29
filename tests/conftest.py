@@ -7,10 +7,33 @@ from pathlib import Path
 import asyncpg
 import psycopg
 import pytest
-from psycopg.errors import DuplicateDatabase
 from tracktolib.pg_sync import get_tables, clean_tables, insert_many
 from typing_extensions import LiteralString
 import tempfile
+from .utils import create_db
+
+__all__ = (
+    "engine",
+    "aengine",
+    "apool",
+    "loop",
+    "setup_tables",
+    "clean_pg",
+    "populate_data",
+    "sample_engine",
+    "clean_sample_pg",
+    "setup_sample_tables",
+    "PG_URL",
+    "PG_DATABASE",
+    "PG_SAMPLE_DATABASE",
+    "STATIC_DIR",
+    "setup_test_db",
+    "setup_sample_db",
+    "PG_HOST",
+    "PG_PORT",
+    "PG_PASSWORD",
+    "set_envs",
+)
 
 PG_HOST = os.getenv("PG_HOST", "localhost")
 PG_PORT = int(os.getenv("PG_PORT", "5432"))
@@ -79,17 +102,7 @@ def setup_tables(engine):
 
 @pytest.fixture(autouse=False, scope="session")
 def setup_test_db():
-    pg_conn = psycopg.connect(f"{PG_URL}/postgres")
-    pg_conn.autocommit = True
-    try:
-        with pg_conn.cursor() as cursor:
-            cursor.execute(f"CREATE DATABASE {PG_DATABASE}")
-    except DuplicateDatabase:
-        pass
-
-    yield
-
-    pg_conn.close()
+    create_db(PG_URL, PG_DATABASE, drop_first=False)
 
 
 PG_SAMPLE_DATABASE = "sample"
@@ -97,21 +110,7 @@ PG_SAMPLE_DATABASE = "sample"
 
 @pytest.fixture(autouse=True, scope="session")
 def setup_sample_db():
-    pg_conn = psycopg.connect(f"{PG_URL}/postgres")
-    pg_conn.autocommit = True
-    try:
-        pg_conn.execute(f"DROP DATABASE {PG_SAMPLE_DATABASE}")
-    except psycopg.errors.InvalidCatalogName:
-        pass
-    try:
-        with pg_conn.cursor() as cursor:
-            cursor.execute(f"CREATE DATABASE {PG_SAMPLE_DATABASE}")
-    except DuplicateDatabase:
-        pass
-
-    yield
-
-    pg_conn.close()
+    create_db(PG_URL, PG_SAMPLE_DATABASE, drop_first=True)
 
 
 @pytest.fixture()

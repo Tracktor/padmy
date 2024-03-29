@@ -3,20 +3,18 @@ import time
 import uuid
 from pathlib import Path
 
-from rich.console import Console
 from rich.markup import escape
 from rich.prompt import Prompt
 
 from padmy.logs import logs
 from .utils import get_files, iter_migration_files
 from .config import MigrationConfig
-
-_CONSOLE = Console(markup=True, highlight=False)
+from padmy.env import CONSOLE
 
 
 def _get_user_email() -> str | None:
     _config = MigrationConfig.load()
-    author = Prompt.ask("[blue]Author[/blue]", default=_config.author, console=_CONSOLE)
+    author = Prompt.ask("[blue]Author[/blue]", default=_config.author, console=CONSOLE)
     _config.author = author
     _config.save()
     return author
@@ -38,7 +36,7 @@ def create_new_migration(folder: Path):
     folder.mkdir(exist_ok=True, parents=True)
 
     _base_name = f"{int(time.time())}-{str(uuid.uuid4())[:8]}"
-    _CONSOLE.print(f"\nCreating new migration file ([green]{escape(_base_name)}[/green]):\n")
+    CONSOLE.print(f"\nCreating new migration file ([green]{escape(_base_name)}[/green]):\n")
 
     last_migration = _get_last_migration_name(folder)
     logs.debug(f"Last migration files: {last_migration}")
@@ -58,4 +56,4 @@ def create_new_migration(folder: Path):
     up_file.write_text(file_header)
     down_file.write_text(file_header.replace("-up", "-down"))
 
-    _CONSOLE.print("\nNew files created!\n")
+    CONSOLE.print("\nNew files created!\n")
