@@ -14,7 +14,7 @@ from padmy.db import pretty_print_stats, pprint_compared_dbs, Database
 from padmy.logs import setup_logging, logs
 from padmy.migration import migration
 from padmy.sampling import sample_database, copy_database
-from padmy.utils import get_pg_root, get_pg_root_from, init_connection, check_cmd
+from padmy.utils import get_pg_root, get_pg_root_from, init_connection
 from padmy.env import CONSOLE
 
 cli = Cli("Padmy utility commands")
@@ -188,8 +188,6 @@ def schema_diff(
 ):
     from padmy.compare import compare_databases
 
-    for cmd in ["pg_dump"]:
-        check_cmd(cmd)
     with tempfile.TemporaryDirectory() as dump_dir:
         _dump_dir = Path(dump_dir)
         diff = compare_databases(

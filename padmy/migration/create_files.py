@@ -29,7 +29,7 @@ def _get_last_migration_name(folder: Path) -> str | None:
     return up_file.path.name
 
 
-def create_new_migration(folder: Path):
+def create_new_migration(folder: Path, version: str | None = None) -> tuple[Path, Path]:
     """
     Creates 2 new files, up and down
     """
@@ -46,14 +46,17 @@ def create_new_migration(folder: Path):
     up_file = folder / Path(f"{_base_name}-up.sql")
     down_file = folder / Path(f"{_base_name}-down.sql")
 
-    file_header = textwrap.dedent(
-        f"""
-    -- Prev-file: {last_migration or ''}
-    -- Author: {author or ''}
-    """
-    ).strip()
+    _header = [
+        f"-- Prev-file: {last_migration or ''}",
+        f"-- Author: {author or ''}",
+    ]
+    if version:
+        _header.append(f"-- Version: {version}")
+
+    file_header = textwrap.dedent("\n".join(_header)).strip()
 
     up_file.write_text(file_header)
     down_file.write_text(file_header.replace("-up", "-down"))
 
     CONSOLE.print("\nNew files created!\n")
+    return up_file, down_file

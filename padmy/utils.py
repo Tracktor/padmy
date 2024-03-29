@@ -84,6 +84,12 @@ def check_cmd(cmd: str):
     _COMMANDS[cmd] = path.strip()
 
 
+def _get_check_cmd(cmd: str):
+    if cmd not in _COMMANDS:
+        check_cmd(cmd)
+    return _COMMANDS[cmd]
+
+
 def get_pg_envs():
     reload(env)
     return {
@@ -141,7 +147,7 @@ def pg_dump(
 ):
     _schemas = "|".join(x for x in schemas)
     cmd = [
-        _COMMANDS["pg_dump"],
+        _get_check_cmd("pg_dump"),
         "-n",
         f"'({_schemas})'",
         "-d",
@@ -166,7 +172,7 @@ def pg_restore(
     port: int | None = None,
     on_stderr: OnStdErrorFn | None = None,
 ):
-    cmd = [_COMMANDS["pg_restore"], "-d", database, dump_path] + _get_conn_infos(user, password, host, port)
+    cmd = [_get_check_cmd("pg_restore"), "-d", database, dump_path] + _get_conn_infos(user, password, host, port)
     if options is not None:
         cmd += options
     _on_stderr = on_stderr or partial(_on_pg_error, cmd=cmd)
@@ -182,7 +188,7 @@ def create_db(
     port: int | None = None,
     on_stderr: OnStdErrorFn | None = None,
 ):
-    cmd = [_COMMANDS["createdb"], database] + _get_conn_infos(user, password, host, port)
+    cmd = [_get_check_cmd("createdb"), database] + _get_conn_infos(user, password, host, port)
     _on_stderr = on_stderr or partial(_on_pg_error, cmd=cmd)
     exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_stderr)
 
@@ -197,7 +203,7 @@ def drop_db(
     port: int | None = None,
     on_stderr: OnStdErrorFn | None = None,
 ):
-    cmd = [_COMMANDS["dropdb"]] + _get_conn_infos(user, password, host, port)
+    cmd = [_get_check_cmd("dropdb")] + _get_conn_infos(user, password, host, port)
 
     if if_exists:
         cmd.append("--if-exists")
@@ -216,7 +222,7 @@ def exec_psql_file(
     port: int | None = None,
     on_stderr: OnStdErrorFn | None = None,
 ):
-    cmd = [_COMMANDS["psql"], "-f", sql_file, "-d", database] + _get_conn_infos(user, password, host, port)
+    cmd = [_get_check_cmd("psql"), "-f", sql_file, "-d", database] + _get_conn_infos(user, password, host, port)
     _on_stderr = on_stderr or partial(_on_pg_error, cmd=cmd)
     exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_stderr)
 
@@ -231,7 +237,7 @@ def exec_psql(
     port: int | None = None,
     on_stderr: OnStdErrorFn | None = None,
 ):
-    cmd = [_COMMANDS["psql"], "-c", f"'{query}'", "-d", database] + _get_conn_infos(user, password, host, port)
+    cmd = [_get_check_cmd("psql"), "-c", f"'{query}'", "-d", database] + _get_conn_infos(user, password, host, port)
     _on_stderr = on_stderr or partial(_on_pg_error, cmd=cmd)
     exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_stderr)
 

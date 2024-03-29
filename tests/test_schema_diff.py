@@ -93,9 +93,7 @@ def diffs(no_diffs, engine_to):
 def test_schema_differences(tmp_path, request, patch_scenario, expected_diff):
     request.getfixturevalue(patch_scenario)
     from padmy.compare import compare_databases
-    from padmy.utils import check_cmd
 
-    check_cmd("pg_dump")
     diff = compare_databases(
         PG_URL, database=FROM_DB, schemas=["schema1", "schema2"], dump_dir=tmp_path, db_to=TO_DB, no_privileges=True
     )
