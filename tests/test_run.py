@@ -54,3 +54,9 @@ def test_run_copy_db(capsys):
     cli.run_with_args("copy-db", "--db", "test", "--db-to", "test2", "--schemas", "public")
     capsys.readouterr()
     # _ = capsys.readouterr().out
+
+
+def test_run_schema_diff():
+    from run import cli
+
+    cli.run_with_args("schema-diff", "--db", "test", "--schemas", "public")

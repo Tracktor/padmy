@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 
 from asyncpg import Connection
-from piou import Option, Derived, CommandGroup, Password
+from piou import Option, Derived, CommandGroup, Password, CommandError
 
 from padmy.env import SQL_DIR, MIGRATION_DIR
 from padmy.logs import logs
@@ -50,7 +50,9 @@ async def apply_sql_files(
 
 
 @migration.command(cmd="new", help="Creates 2 new files for a migration (up and down)")
-def new_migrate_file(migration_folder: Path = MigrationDir):
+def new_migrate_file(
+    migration_folder: Path = MigrationDir, version: str = Option(None, "--version", help="Version of the migration")
+):
     """
     Creates 2 new files for a migration (up and down).
     When applying *up.sql* then *down.sql*, the database must be
@@ -59,7 +61,7 @@ def new_migrate_file(migration_folder: Path = MigrationDir):
     """
     from .create_files import create_new_migration
 
-    create_new_migration(migration_folder)
+    create_new_migration(migration_folder, version=version)
 
 
 @migration.command(cmd="up", help="Migrate database to the new schema")
@@ -125,3 +127,15 @@ def migrate_verify_main(
     except MigrationError as e:
         logs.error(e.msg)
         logs.debug(e.diff)
+
+
+@migration.command(cmd="verify-files", help="Verify the files are correctly ordered")
+def verify_files(
+    sql_dir: Path = MigrationDir,
+    no_raise_error: bool = Option(False, "--no-raise", help="Raise an error if the files are not correctly ordered"),
+):
+    from .utils import verify_migration_files
+
+    has_errors = verify_migration_files(sql_dir, raise_error=not no_raise_error)
+    if has_errors:
+        raise CommandError("Files are not correctly ordered")

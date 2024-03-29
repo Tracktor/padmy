@@ -1,6 +1,6 @@
 import tempfile
 from pathlib import Path
-
+import logging
 import pytest
 
 from ..conftest import STATIC_DIR
@@ -40,3 +40,11 @@ def setup_test_schema(engine):
     with engine.cursor() as c:
         c.execute("DROP SCHEMA general CASCADE")
     engine.commit()
+
+
+@pytest.fixture(autouse=True)
+def restore_log_lvl():
+    from padmy.logs import logs
+
+    yield
+    logs.setLevel(logging.INFO)

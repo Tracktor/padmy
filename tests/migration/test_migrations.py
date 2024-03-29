@@ -1,8 +1,10 @@
 import logging
 import re
+from contextlib import nullcontext
 
 import pytest
 
+from unittest.mock import Mock
 from .conftest import VALID_MIGRATIONS_DIR, INVALID_MIGRATIONS_DIR
 from ..conftest import PG_DATABASE
 from tracktolib.pg_sync import fetch_all
@@ -11,7 +13,8 @@ from ..utils import check_table_exists, check_column_exists
 TEST_EMAIL = "foo@baz.baz"
 
 
-def test_create_new_migration(monkeypatch, migration_dir, capsys):
+@pytest.mark.parametrize("version", [None, "0.0.0"])
+def test_create_new_migration(monkeypatch, migration_dir, capsys, version):
     from padmy.migration import create_new_migration
 
     monkeypatch.setattr("padmy.migration.utils.get_git_email", lambda x: TEST_EMAIL)
@@ -32,27 +35,29 @@ def test_create_new_migration(monkeypatch, migration_dir, capsys):
             return TEST_EMAIL
 
     monkeypatch.setattr("padmy.migration.create_files.Prompt", PromptMock)
-    create_new_migration(folder=migration_dir)
+    create_new_migration(folder=migration_dir, version=version)
     new_files = list(migration_dir.glob("*.sql"))
     assert capsys.readouterr().out.strip().startswith("Creating new migration file")
     assert len(new_files) == 2
     down_file, up_file = sorted(new_files)
     up_content = [x.rstrip() for x in up_file.open().readlines() if x.strip()]
 
-    assert up_content == ["-- Prev-file:", f"-- Author: {TEST_EMAIL}"]
+    _optional_args = [f"-- Version: {version}"] if version else []
+
+    assert up_content == ["-- Prev-file:", f"-- Author: {TEST_EMAIL}"] + _optional_args
     down_content = [x.rstrip() for x in down_file.open().readlines() if x.strip()]
-    assert down_content == ["-- Prev-file:", f"-- Author: {TEST_EMAIL}"]
+    assert down_content == ["-- Prev-file:", f"-- Author: {TEST_EMAIL}"] + _optional_args
 
     # Creating second migration
 
-    create_new_migration(folder=migration_dir)
+    create_new_migration(folder=migration_dir, version=version)
     new_files = list(migration_dir.glob("*.sql"))
     assert capsys.readouterr().out.strip().startswith("Creating new migration file")
     up_file2, down_file2 = sorted(new_files, key=lambda x: x.name, reverse=True)[:2]
     up_content = [x.rstrip() for x in up_file2.open().readlines() if x.strip()]
-    assert up_content == [f"-- Prev-file: {up_file.name}", f"-- Author: {TEST_EMAIL}"]
+    assert up_content == [f"-- Prev-file: {up_file.name}", f"-- Author: {TEST_EMAIL}"] + _optional_args
     down_content = [x.rstrip() for x in down_file2.open().readlines() if x.strip()]
-    assert down_content == [f"-- Prev-file: {down_file.name}", f"-- Author: {TEST_EMAIL}"]
+    assert down_content == [f"-- Prev-file: {down_file.name}", f"-- Author: {TEST_EMAIL}"] + _optional_args
 
 
 @pytest.mark.usefixtures("clean_migration")
@@ -212,3 +217,68 @@ def test_migrate_up_down(engine, monkeypatch, caplog, aengine, loop):
     assert check_column_exists(engine, "general", "test", "baz")
     data = fetch_all(engine, "SELECT * FROM public.migration ORDER BY applied_at DESC")
     assert len(data) == 6
+
+
+class TestMigrationFiles:
+    @pytest.fixture(autouse=True)
+    def setup(self, monkeypatch, migration_dir):
+        monkeypatch.setattr("padmy.migration.create_files._get_user_email", lambda: TEST_EMAIL)
+        yield
+        for _file in migration_dir.glob("*.sql"):
+            _file.unlink()
+
+    @pytest.fixture()
+    def setup_valid_migration_files(self, migration_dir, monkeypatch):
+        monkeypatch.setattr("padmy.migration.create_files._get_user_email", lambda: TEST_EMAIL)
+        mock = Mock()
+        monkeypatch.setattr("time.time", mock)
+        from padmy.migration import create_new_migration
+
+        mock.return_value = 1
+        create_new_migration(migration_dir)
+        mock.return_value = 2
+        create_new_migration(migration_dir)
+        mock.return_value = 3
+        create_new_migration(migration_dir)
+
+    @pytest.fixture()
+    def setup_invalid_up_migration_files(self, migration_dir, monkeypatch):
+        monkeypatch.setattr("padmy.migration.create_files._get_user_email", lambda: TEST_EMAIL)
+        monkeypatch.setattr("padmy.migration.create_files._get_last_migration_name", lambda _: "0-10000000")
+        uuid_mock = Mock()
+        mock = Mock()
+        monkeypatch.setattr("uuid.uuid4", uuid_mock)
+        monkeypatch.setattr("time.time", mock)
+        from padmy.migration import create_new_migration
+
+        mock.return_value = 1
+        uuid_mock.return_value = "10000000"
+        create_new_migration(migration_dir)
+        mock.return_value = 2
+        uuid_mock.return_value = "20000000"
+        up_file, _ = create_new_migration(migration_dir)
+
+    @pytest.mark.parametrize(
+        "setup, expected",
+        [
+            pytest.param("setup_valid_migration_files", nullcontext(False), id="valid"),
+            pytest.param(
+                "setup_invalid_up_migration_files",
+                pytest.raises(
+                    ValueError,
+                    match=re.escape(
+                        "Invalid header for up file 2-20000000-up.sql : (expected '1-10000000-up.sql' got '0-10000000')"
+                    ),
+                ),
+                id="invalid",
+            ),
+        ],
+    )
+    def test_verify_migration_files(self, migration_dir, setup, expected, request, capsys):
+        request.getfixturevalue(setup)
+        from padmy.migration.utils import verify_migration_files
+
+        with expected as e:
+            assert verify_migration_files(migration_dir, raise_error=True) == e
+
+        assert capsys.readouterr().out.strip()

@@ -58,6 +58,11 @@ def set_envs():
         yield
 
 
+@pytest.fixture()
+def padmy_folder():
+    return Path(os.environ["PADMY_FOLDER"])
+
+
 @pytest.fixture(scope="session")
 def engine() -> typing.Generator[psycopg.Connection, None, None]:
     conn = psycopg.connect(f"{PG_URL}/{PG_DATABASE}")

@@ -179,6 +179,12 @@ poetry run cli -vv migrate verify --sql-dir /tmp/migrations
 
 We are all good !
 
+**Optional**: You can also verify that the order of the migration is correct by running:
+
+```bash
+poetry run cli -vv migrate verify-files --sql-dir /tmp/migrations --no-raise
+```
+
 ## 4. Comparing databases schemas
 
 You can compare two databases by running:
