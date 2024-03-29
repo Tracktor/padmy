@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from rich.console import Console
 
 PG_DATABASE = os.getenv("PG_DATABASE", "postgres")
 PG_HOST = os.getenv("PG_HOST", "localhost")
@@ -13,3 +14,6 @@ MIGRATION_DIR = os.getenv("MIGRATION_DIR")
 
 _PADMY_FOLDER = Path(os.getenv("PADMY_FOLDER", Path.home() / ".padmy"))
 PADMY_CONFIG = _PADMY_FOLDER / "config.json"
+
+
+CONSOLE = Console(markup=True, highlight=False)

@@ -137,6 +137,7 @@ def pg_dump(
     host: str | None = None,
     port: int | None = None,
     on_stderr: OnStdErrorFn | None = None,
+    get_env: bool = True,
 ):
     _schemas = "|".join(x for x in schemas)
     cmd = [
@@ -151,7 +152,7 @@ def pg_dump(
 
     cmd += [">", dump_path]
     _on_stderr = on_stderr or partial(_on_pg_error, cmd=cmd)
-    exec_cmd(cmd, env=get_pg_envs(), on_stderr=_on_stderr)
+    exec_cmd(cmd, env=get_pg_envs() if get_env else None, on_stderr=_on_stderr)
 
 
 def pg_restore(
@@ -373,6 +374,25 @@ def temp_env(new_env: dict):
         yield
     finally:
         os.environ.update(_env)
+
+
+@contextmanager
+def temp_pg_env(pg_url: str):
+    """
+    Overrides the PG environment variables with the given pg_url
+    """
+    _pg_infos = parse_pg_uri(pg_url)
+    _env = {
+        "PGHOST": _pg_infos["host"],
+        "PGPORT": str(_pg_infos["port"]),
+        "PGUSER": _pg_infos["user"],
+        "PGPASSWORD": _pg_infos["password"],
+    }
+    if _pg_infos["database"]:
+        _env["PGDATABASE"] = _pg_infos["database"]
+
+    with temp_env(_env):
+        yield
 
 
 async def init_connection(conn: asyncpg.Connection):
