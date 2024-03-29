@@ -168,6 +168,7 @@ async def migrate_up(
     folder: Path,
     *,
     nb_migrations: int = -1,
+    metadata: dict | None = None,
 ):
     """Migrate from the latest migration applied available in the database
     to the latest one in the `folder` dir.
@@ -204,6 +205,8 @@ async def migrate_up(
                 "migration_type": "up",
                 "file_name": _migration.path.name,
             }
+            if metadata:
+                commit_data["meta"] = metadata
             await insert_many(conn, "public.migration", [commit_data])
 
     logs.info("Done!")
@@ -214,6 +217,7 @@ async def migrate_down(
     folder: Path,
     *,
     nb_migrations: int = -1,
+    metadata: dict | None = None,
     # migration_id: str = None
 ):
     """
@@ -254,6 +258,8 @@ async def migrate_down(
                 "migration_type": "down",
                 "file_name": _rollback.path.name,
             }
+            if metadata:
+                commit_data["meta"] = metadata
             await insert_many(conn, "public.migration", [commit_data])
 
     logs.info("Done!")
