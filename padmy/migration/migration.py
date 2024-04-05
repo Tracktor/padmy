@@ -3,6 +3,7 @@ import datetime as dt
 import difflib
 import filecmp
 import functools
+from contextlib import nullcontext
 from pathlib import Path
 
 from asyncpg import Connection
@@ -169,6 +170,7 @@ async def migrate_up(
     *,
     nb_migrations: int = -1,
     metadata: dict | None = None,
+    use_transaction: bool = True,
 ):
     """Migrate from the latest migration applied available in the database
     to the latest one in the `folder` dir.
@@ -190,8 +192,9 @@ async def migrate_up(
         logs.info("No migrations to apply")
         return
 
+    _transaction = conn.transaction if use_transaction else nullcontext
     logs.info(f"Found {len(migrations_to_apply)} migrations to apply")
-    async with conn.transaction():
+    async with _transaction():
         for _migration in migrations_to_apply:
             logs.info(f"Running {_migration.path.name}...")
             try:
@@ -218,6 +221,7 @@ async def migrate_down(
     *,
     nb_migrations: int = -1,
     metadata: dict | None = None,
+    use_transaction: bool = True,
     # migration_id: str = None
 ):
     """
@@ -242,8 +246,9 @@ async def migrate_down(
         logs.info("No rollback files to apply")
         return
 
+    _transaction = conn.transaction if use_transaction else nullcontext
     logs.info(f"Found {nb_files} rollback files to apply")
-    async with conn.transaction():
+    async with _transaction():
         for _rollback in rollback_to_apply:
             logs.info(f"Running {_rollback.path.name}...")
             try:
