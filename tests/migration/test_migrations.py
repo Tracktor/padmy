@@ -69,7 +69,8 @@ def test_migrate_setup(engine, loop, aengine):
 
 
 @pytest.mark.usefixtures("setup_test_schema")
-def test_migrate_verify_valid(monkeypatch, engine, tmp_path):
+@pytest.mark.parametrize("only_last", [True, False])
+def test_migrate_verify_valid(monkeypatch, engine, tmp_path, only_last):
     from padmy.migration import migrate_verify
     from padmy.migration.migration import MigrationError
 
@@ -78,6 +79,7 @@ def test_migrate_verify_valid(monkeypatch, engine, tmp_path):
         schemas=["general"],
         dump_dir=tmp_path,
         migration_folder=VALID_MIGRATIONS_DIR,
+        only_last=only_last,
     )
     # Rerunning again for double check
 
@@ -87,6 +89,7 @@ def test_migrate_verify_valid(monkeypatch, engine, tmp_path):
             schemas=["general"],
             dump_dir=tmp_path,
             migration_folder=VALID_MIGRATIONS_DIR,
+            only_last=only_last,
         )
     except MigrationError as e:
         print(e.diff)
@@ -94,7 +97,8 @@ def test_migrate_verify_valid(monkeypatch, engine, tmp_path):
 
 
 @pytest.mark.usefixtures("setup_test_schema")
-def test_migrate_verify_invalid(monkeypatch, engine, tmp_path):
+@pytest.mark.parametrize("only_last", [True, False])
+def test_migrate_verify_invalid(monkeypatch, engine, tmp_path, only_last):
     from padmy.migration import migrate_verify
     from padmy.migration.migration import MigrationError
 
@@ -104,6 +108,7 @@ def test_migrate_verify_invalid(monkeypatch, engine, tmp_path):
             schemas=["general"],
             dump_dir=tmp_path,
             migration_folder=INVALID_MIGRATIONS_DIR,
+            only_last=only_last,
         )
 
     # TODO: flaky on CI
