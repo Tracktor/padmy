@@ -90,10 +90,7 @@ def _verify_migration(
 
 
 def migrate_verify(
-    database: str,
-    schemas: list[str],
-    dump_dir: Path,
-    migration_folder: Path,
+    database: str, schemas: list[str], dump_dir: Path, migration_folder: Path, *, only_last: bool = False
 ):
     """
     Verifies that the up/down migration is correct
@@ -105,17 +102,23 @@ def migrate_verify(
 
     logs.info("Checking...")
     _down_files: list[MigrationFile] = []
+    _nb_migrations = int(len(migration_files) / 2)
     try:
         for i, (_up_file, _down_file) in enumerate(iter_migration_files(migration_files)):
-            logs.info(f"Checking migration {i + 1}/{int(len(migration_files) / 2)}")
-            _verify_migration(
-                database=database,
-                schemas=schemas,
-                migration_id=_up_file.file_id,
-                up_file=_up_file.path,
-                down_file=_down_file.path,
-                dump_dir=dump_dir,
-            )
+            # We verify all if only_last is False or if we only have one migration (up/down)
+            _skip = only_last and i != _nb_migrations - 1 and len(migration_files) != 2
+            if not _skip:
+                logs.info(f"Checking migration {i + 1}/{_nb_migrations}")
+                _verify_migration(
+                    database=database,
+                    schemas=schemas,
+                    migration_id=_up_file.file_id,
+                    up_file=_up_file.path,
+                    down_file=_down_file.path,
+                    dump_dir=dump_dir,
+                )
+            else:
+                logs.info(f"Skipping migration {_up_file.file_id}")
             # Need to be reapplied for the next tests
             exec_psql_file(database, str(_up_file.path))
             _down_files.append(_down_file)

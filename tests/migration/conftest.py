@@ -26,7 +26,8 @@ def clean_migration(engine):
 
 
 VALID_MIGRATIONS_DIR = STATIC_DIR / "migrations" / "valid"
-INVALID_MIGRATIONS_DIR = STATIC_DIR / "migrations" / "invalid"
+INVALID_MIGRATIONS_DIR = STATIC_DIR / "migrations" / "invalid-simple"
+INVALID_MIGRATIONS_DIR_MULTIPLE = STATIC_DIR / "migrations" / "invalid-multiple"
 
 
 @pytest.fixture()
