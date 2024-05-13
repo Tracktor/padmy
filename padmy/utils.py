@@ -135,8 +135,10 @@ def _get_conn_infos(
 def pg_dump(
     database: str,
     schemas: list[str],
-    dump_path: str,
+    dump_path: str | None = None,
     options: list[str] | None = None,
+    with_grants: bool = True,
+    with_comments: bool = True,
     *,
     user: str | None = None,
     password: str | None = None,
@@ -144,7 +146,7 @@ def pg_dump(
     port: int | None = None,
     on_stderr: OnStdErrorFn | None = None,
     get_env: bool = True,
-):
+) -> str | None:
     _schemas = "|".join(x for x in schemas)
     cmd = [
         _get_check_cmd("pg_dump"),
@@ -153,12 +155,17 @@ def pg_dump(
         "-d",
         database,
     ] + _get_conn_infos(user, password, host, port)
+    if not with_grants:
+        cmd += ["--no-owner", "--no-privileges"]
+    if not with_comments:
+        cmd += ["--no-comments"]
     if options:
         cmd += options
 
-    cmd += [">", dump_path]
+    if dump_path:
+        cmd += [">", dump_path]
     _on_stderr = on_stderr or partial(_on_pg_error, cmd=cmd)
-    exec_cmd(cmd, env=get_pg_envs() if get_env else None, on_stderr=_on_stderr)
+    return exec_cmd(cmd, env=get_pg_envs() if get_env else None, on_stderr=_on_stderr)
 
 
 def pg_restore(
