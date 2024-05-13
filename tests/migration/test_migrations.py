@@ -5,7 +5,7 @@ from contextlib import nullcontext
 import pytest
 
 from unittest.mock import Mock
-from .conftest import VALID_MIGRATIONS_DIR, INVALID_MIGRATIONS_DIR
+from .conftest import VALID_MIGRATIONS_DIR, INVALID_MIGRATIONS_DIR, INVALID_MIGRATIONS_DIR_MULTIPLE
 from ..conftest import PG_DATABASE
 from tracktolib.pg_sync import fetch_all
 from ..utils import check_table_exists, check_column_exists
@@ -97,7 +97,7 @@ def test_migrate_verify_valid(monkeypatch, engine, tmp_path, only_last):
 
 
 @pytest.mark.usefixtures("setup_test_schema")
-@pytest.mark.parametrize("only_last", [True, False])
+@pytest.mark.parametrize("only_last", [False, True])
 def test_migrate_verify_invalid(monkeypatch, engine, tmp_path, only_last):
     from padmy.migration import migrate_verify
     from padmy.migration.migration import MigrationError
@@ -119,6 +119,22 @@ def test_migrate_verify_invalid(monkeypatch, engine, tmp_path, only_last):
     # compare_files(
     #     error_file, INVALID_MIGRATIONS_DIR / "1-00000000.diff", ignore_order=True
     # )
+
+
+@pytest.mark.usefixtures("setup_test_schema")
+@pytest.mark.parametrize("only_last", [False, True])
+def test_migrate_verify_multiple_invalid(monkeypatch, engine, tmp_path, only_last):
+    from padmy.migration import migrate_verify
+    from padmy.migration.migration import MigrationError
+
+    with pytest.raises(MigrationError, match=re.escape("Difference found for migration: 00000001")):
+        migrate_verify(
+            database=PG_DATABASE,
+            schemas=["general"],
+            dump_dir=tmp_path,
+            migration_folder=INVALID_MIGRATIONS_DIR_MULTIPLE,
+            only_last=only_last,
+        )
 
 
 SETUP_ERROR_MSG = re.escape(

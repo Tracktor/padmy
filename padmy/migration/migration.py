@@ -102,10 +102,13 @@ def migrate_verify(
 
     logs.info("Checking...")
     _down_files: list[MigrationFile] = []
+    _nb_migrations = int(len(migration_files) / 2)
     try:
         for i, (_up_file, _down_file) in enumerate(iter_migration_files(migration_files)):
-            logs.info(f"Checking migration {i + 1}/{int(len(migration_files) / 2)}")
-            if not only_last and i < len(migration_files) - 2:
+            # We verify all if only_last is False or if we only have one migration (up/down)
+            _skip = only_last and i != _nb_migrations - 1 and len(migration_files) != 2
+            if not _skip:
+                logs.info(f"Checking migration {i + 1}/{_nb_migrations}")
                 _verify_migration(
                     database=database,
                     schemas=schemas,
