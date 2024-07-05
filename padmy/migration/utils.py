@@ -1,5 +1,13 @@
-import dataclasses
 import datetime as dt
+import sys
+
+if sys.version_info >= (3, 12):
+    UTC = dt.UTC
+else:
+    from pytz import UTC
+
+import dataclasses
+
 from itertools import groupby
 from operator import attrgetter
 from pathlib import Path
@@ -54,7 +62,7 @@ def get_files(folder: Path, reverse: bool = False) -> list[MigrationFile]:
         header = Header.from_text(file.read_text())
         files.append(
             MigrationFile(
-                ts=dt.datetime.fromtimestamp(int(ts)),
+                ts=dt.datetime.fromtimestamp(int(ts), tz=UTC).replace(tzinfo=None),
                 file_id=file_id,
                 file_type=file_type,
                 path=file,
