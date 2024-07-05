@@ -1,4 +1,4 @@
-FROM python:3.10-alpine
+FROM python:3.12-alpine
 
 
 RUN apk --no-cache add bash postgresql14-client && \
