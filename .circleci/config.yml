@@ -253,9 +253,8 @@ jobs:
           keys:
             - deps-v0-{{ checksum "poetry.lock" }}
       - run:
-          name: Installing deps
-          command: |
-            poetry install --quiet
+          name: Install bump deps
+          command: pip install commitizen==3.11.0
       - sre/bump-version:
           lang: "python"
           branch: "master"
