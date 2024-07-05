@@ -54,7 +54,7 @@ def get_files(folder: Path, reverse: bool = False) -> list[MigrationFile]:
         header = Header.from_text(file.read_text())
         files.append(
             MigrationFile(
-                ts=dt.datetime.fromtimestamp(int(ts)),
+                ts=dt.datetime.fromtimestamp(int(ts), tz=dt.UTC).replace(tzinfo=None),
                 file_id=file_id,
                 file_type=file_type,
                 path=file,
