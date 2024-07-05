@@ -7,7 +7,7 @@ authors = ["andarius <julien.brayere@tracktor.fr>"]
 [tool.poetry.dependencies]
 python = ">=3.12,<4"
 piou = ">=0.13.4,<1.0.0"
-asyncpg = ">=0.28.0"
+asyncpg = ">=0.29.0"
 PyYAML = ">=6.0"
 typing-extensions = ">=4.3.0"
 networkx = { version = ">=3.1.0", optional = true }
@@ -21,11 +21,11 @@ pytz = { version = "^2024.1", python = "<3.12" }
 network = ["networkx", "dash", "dash-cytoscape"]
 
 [tool.poetry.group.dev.dependencies]
-pyright = "^1.1.352"
-pytest = "^7.1.2"
-pytest-cov = "^4.0.0"
+pyright = "^1.1.370"
+pytest = "^8.2.2"
+pytest-cov = "^5.0.0"
 deepdiff = "^5.8.1"
-ruff = "^0.1.6"
+ruff = "^0.5.0"
 psycopg = "^3.1.12"
 tracktolib = { version = ">=0.47", extras = ["pg-sync"] }
 
