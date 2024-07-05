@@ -15,7 +15,7 @@ from padmy.utils import exec_file, pg_dump, exec_psql_file
 from .utils import get_files, iter_migration_files, MigrationFile
 
 _GET_LATEST_COMMIT_QUERY = """
-SELECT file_ts, file_name
+SELECT file_ts, file_name, file_id
 FROM public.migration
 ORDER BY applied_at DESC, file_ts DESC
 LIMIT 1
@@ -143,10 +143,11 @@ def migrate_verify(
 class LatestMigration:
     timestamp: dt.datetime
     file_name: str
+    file_id: str
 
     @classmethod
     def load(cls, data: dict):
-        return cls(timestamp=data["file_ts"], file_name=data["file_name"])
+        return cls(timestamp=data["file_ts"], file_name=data["file_name"], file_id=data["file_id"])
 
 
 class NoSetupTableError(Exception):
@@ -179,7 +180,11 @@ async def migrate_up(
     to the latest one in the `folder` dir.
     """
     latest_migration = await _get_latest_migration(conn)
-    logs.info(f"Latest timestamp: {latest_migration.timestamp}" if latest_migration else "No previous migration found")
+    logs.info(
+        f"Latest timestamp: {latest_migration.timestamp} ({latest_migration.file_id})"
+        if latest_migration
+        else "No previous migration found"
+    )
     migration_files = get_files(folder)
 
     migrations_to_apply = [
