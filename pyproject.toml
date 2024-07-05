@@ -5,7 +5,7 @@ description = ""
 authors = ["andarius <julien.brayere@tracktor.fr>"]
 
 [tool.poetry.dependencies]
-python = ">=3.11,<4"
+python = ">=3.12,<4"
 piou = ">=0.13.4,<1.0.0"
 asyncpg = ">=0.28.0"
 PyYAML = ">=6.0"

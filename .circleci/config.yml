@@ -39,15 +39,6 @@ executors:
     docker:
       - image: cimg/python:3.12.3-node
 
-  tests-3-11:
-    docker:
-      - image: cimg/python:3.11.9-node
-        environment:
-          PYRIGHT_PYTHON_GLOBAL_NODE: true
-      - image: cimg/postgres:14.9-postgis
-        environment:
-          POSTGRES_PASSWORD: postgres
-
   tests-3-12:
     docker:
       - image: cimg/python:3.12.3-node
@@ -60,34 +51,6 @@ executors:
 jobs:
 
   # Testing
-
-  run-tests-3-11:
-    executor: tests-3-11
-    steps:
-      - checkout
-      - run:
-          name: Installing psql
-          # Version should match the PG image
-          command: |
-            # Create the file repository configuration:
-            sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-            # Import the repository signing key:
-            wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
-            sudo apt-get update && sudo apt-get install postgresql-client-14
-      - sre/run-python-tests:
-          extras: '--all-extras --quiet'
-          formatter: 'ruff'
-          before-steps:
-            - run:
-                name: Initializing DB
-                command: ./tests/static/init-pg.sh
-                environment:
-                  PGHOST: 127.0.0.1
-                  PGUSER: postgres
-                  PGPASSWORD: postgres
-                  INIT_FILE: ./tests/init.sql
-                  SQL_FOLDER: ./tests/static
-
   run-tests-3-12:
     executor: tests-3-12
     steps:
@@ -283,15 +246,12 @@ workflows:
 
   run-tests:
     jobs:
-      - run-tests-3-11:
-          filters: *filters_not_tagged
       - run-tests-3-12:
           filters: *filters_not_tagged
       - bump-version:
           filters: *filters_only_master
           context: *production_context
           requires: [
-            run-tests-3-11,
             run-tests-3-12
           ]
 
