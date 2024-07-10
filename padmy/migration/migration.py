@@ -5,7 +5,7 @@ import filecmp
 import functools
 from contextlib import nullcontext
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Iterator
 
 from asyncpg import Connection
 from asyncpg.exceptions import UndefinedTableError
@@ -38,7 +38,23 @@ async def migrate_setup(conn: Connection):
     logs.info("Done")
 
 
-CompareFileFn = Callable[[Path, Path], bool]
+CompareFilesFn = Callable[[Path, Path], Iterator[str] | None]
+
+
+def compare_files(file1: Path, file2: Path) -> Iterator[str] | None:
+    """
+    Compares 2 files. If they are the same, returns None, otherwise returns the diff
+    """
+    _no_diff = filecmp.cmp(file1, file2)
+    if _no_diff:
+        return None
+    diff = difflib.unified_diff(
+        file1.read_text().split("\n"),
+        file2.read_text().split("\n"),
+        fromfile=file1.name,
+        tofile=file2.name,
+    )
+    return diff
 
 
 def _verify_migration(
@@ -49,7 +65,7 @@ def _verify_migration(
     down_file: Path,
     dump_dir: Path,
     *,
-    compare_file_fn: CompareFileFn = filecmp.cmp,
+    compare_files_fn: CompareFilesFn = compare_files,
 ):
     _before_dump, _after_dump = (
         f"{migration_id}-before.sql",
@@ -83,16 +99,9 @@ def _verify_migration(
         dump_dir / _after_dump,
     )
 
-    _no_diff = compare_file_fn(_before_dump_file, _after_dump_file)
-
-    if not _no_diff:
-        diff = difflib.unified_diff(
-            _before_dump_file.read_text().split("\n"),
-            _after_dump_file.read_text().split("\n"),
-            fromfile=_before_dump_file.name,
-            tofile=_after_dump_file.name,
-        )
-        raise MigrationError(f"Difference found for migration: {migration_id}", diff="\n".join(diff))
+    _diff = compare_files_fn(_before_dump_file, _after_dump_file)
+    if _diff is not None:
+        raise MigrationError(f"Difference found for migration: {migration_id}", diff="\n".join(_diff))
 
 
 def migrate_verify(
@@ -102,7 +111,7 @@ def migrate_verify(
     migration_folder: Path,
     *,
     only_last: bool = False,
-    compare_file_fn: CompareFileFn = filecmp.cmp,
+    compare_files_fn: CompareFilesFn = compare_files,
 ):
     """
     Verifies that the up/down migration is correct
@@ -128,7 +137,7 @@ def migrate_verify(
                     up_file=_up_file.path,
                     down_file=_down_file.path,
                     dump_dir=dump_dir,
-                    compare_file_fn=compare_file_fn,
+                    compare_files_fn=compare_files_fn,
                 )
             else:
                 logs.info(f"Skipping migration {_up_file.file_id}")
