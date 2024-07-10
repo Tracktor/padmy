@@ -5,6 +5,7 @@ import filecmp
 import functools
 from contextlib import nullcontext
 from pathlib import Path
+from typing import Callable
 
 from asyncpg import Connection
 from asyncpg.exceptions import UndefinedTableError
@@ -37,6 +38,9 @@ async def migrate_setup(conn: Connection):
     logs.info("Done")
 
 
+CompareFileFn = Callable[[Path, Path], bool]
+
+
 def _verify_migration(
     database: str,
     schemas: list[str],
@@ -44,6 +48,8 @@ def _verify_migration(
     up_file: Path,
     down_file: Path,
     dump_dir: Path,
+    *,
+    compare_file_fn: CompareFileFn = filecmp.cmp,
 ):
     _before_dump, _after_dump = (
         f"{migration_id}-before.sql",
@@ -77,7 +83,7 @@ def _verify_migration(
         dump_dir / _after_dump,
     )
 
-    _no_diff = filecmp.cmp(_before_dump_file, _after_dump_file)
+    _no_diff = compare_file_fn(_before_dump_file, _after_dump_file)
 
     if not _no_diff:
         diff = difflib.unified_diff(
@@ -90,7 +96,13 @@ def _verify_migration(
 
 
 def migrate_verify(
-    database: str, schemas: list[str], dump_dir: Path, migration_folder: Path, *, only_last: bool = False
+    database: str,
+    schemas: list[str],
+    dump_dir: Path,
+    migration_folder: Path,
+    *,
+    only_last: bool = False,
+    compare_file_fn: CompareFileFn = filecmp.cmp,
 ):
     """
     Verifies that the up/down migration is correct
@@ -116,6 +128,7 @@ def migrate_verify(
                     up_file=_up_file.path,
                     down_file=_down_file.path,
                     dump_dir=dump_dir,
+                    compare_file_fn=compare_file_fn,
                 )
             else:
                 logs.info(f"Skipping migration {_up_file.file_id}")
