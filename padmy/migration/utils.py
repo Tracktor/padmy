@@ -54,17 +54,27 @@ class MigrationFile:
     header: Header | None = None
 
 
+def parse_filename(filename: str) -> dict:
+    ts, file_id, file_type = filename.split("-")
+    infos = {
+        "file_ts": dt.datetime.fromtimestamp(int(ts), tz=UTC).replace(tzinfo=None),
+        "file_id": file_id,
+        "migration_type": file_type.replace(".sql", ""),
+    }
+    return infos
+
+
 def get_files(folder: Path, reverse: bool = False) -> list[MigrationFile]:
     """Returns the migration files in ascending order"""
     files = []
     for file in folder.glob("*.sql"):
-        ts, file_id, file_type = file.name.split("-")
+        filename_infos = parse_filename(file.name)
         header = Header.from_text(file.read_text())
         files.append(
             MigrationFile(
-                ts=dt.datetime.fromtimestamp(int(ts), tz=UTC).replace(tzinfo=None),
-                file_id=file_id,
-                file_type=file_type,
+                ts=filename_infos["file_ts"],
+                file_id=filename_infos["file_id"],
+                file_type=filename_infos["migration_type"],
                 path=file,
                 header=header if not header.is_empty else None,
             )
@@ -76,13 +86,13 @@ def iter_migration_files(files: list[MigrationFile]):
     for _file_id, _files_it in groupby(files, lambda x: x.file_id):
         _files: list[MigrationFile] = list(_files_it)
 
-        _up_files = [x for x in _files if x.file_type == "up.sql"]
-        _down_files = [x for x in _files if x.file_type == "down.sql"]
+        _up_files = [x for x in _files if x.file_type == "up"]
+        _down_files = [x for x in _files if x.file_type == "down"]
 
         if len(_up_files) != 1:
             raise ValueError(f'Found {len(_up_files)} "up" files')
         if len(_down_files) != 1:
-            raise ValueError(f'Found {len(_down_files)} "up" files')
+            raise ValueError(f'Found {len(_down_files)} "down" files')
 
         yield _up_files[0], _down_files[0]
 
