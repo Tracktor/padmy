@@ -20,10 +20,6 @@ def clean_migration(engine):
 
     yield
 
-    with engine.cursor() as c:
-        c.execute("DROP TABLE IF EXISTS public.migration")
-    engine.commit()
-
 
 VALID_MIGRATIONS_DIR = STATIC_DIR / "migrations" / "valid"
 INVALID_MIGRATIONS_DIR = STATIC_DIR / "migrations" / "invalid-simple"

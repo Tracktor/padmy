@@ -48,6 +48,7 @@ async def ano_main(
 ):
     config = Config.load_from_file(config_path)
     faker = Faker()
+    print(f"{pg_url}/{db_name}")
     async with asyncpg.create_pool(f"{pg_url}/{db_name}") as pool:
         await anonymize_db(pool, config, faker)
 

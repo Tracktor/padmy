@@ -3,6 +3,7 @@ import datetime as dt
 import difflib
 import filecmp
 import functools
+import typing
 from contextlib import nullcontext
 from pathlib import Path
 from typing import Callable, Iterator
@@ -255,13 +256,20 @@ async def migrate_up(
     return True
 
 
-async def _get_applied_migrations(conn: asyncpg.Connection) -> set[str]:
+class AppliedMigration(typing.TypedDict):
+    file_id: str
+    has_applied_rollback: bool
+
+
+async def get_applied_migrations(conn: asyncpg.Connection) -> list[AppliedMigration]:
     try:
         data = await conn.fetch(
             """
-            SELECT file_id 
-            FROM public.migration
-            where migration_type = 'up' order by applied_at desc
+            SELECT _m.file_id, _r.file_id is not null as has_applied_rollback
+            FROM public.migration _m
+                     left join public.migration _r on _r.migration_type = 'down' and _r.file_id = _m.file_id
+            where _m.migration_type = 'up'
+            order by _m.applied_at desc
             """
         )
     except UndefinedTableError as e:
@@ -272,11 +280,14 @@ async def _get_applied_migrations(conn: asyncpg.Connection) -> set[str]:
             )
         else:
             raise
-    return {x["file_id"] for x in data}
+    return [
+        AppliedMigration(file_id=item["file_id"], has_applied_rollback=item["has_applied_rollback"]) for item in data
+    ]
 
 
 async def get_rollback_files(conn: asyncpg.Connection, folder: Path, *, nb_migrations: int = -1) -> list[MigrationFile]:
-    applied_migration_ids = await _get_applied_migrations(conn)
+    applied_migrations = await get_applied_migrations(conn)
+    applied_migration_ids = {item["file_id"] for item in applied_migrations if not item["has_applied_rollback"]}
     rollback_to_apply = [
         _down_file
         for _up_file, _down_file in iter_migration_files(get_files(folder))
@@ -328,3 +339,4 @@ async def migrate_down(
             await insert_many(conn, "public.migration", [commit_data])
 
     logs.info("Done!")
+    return True

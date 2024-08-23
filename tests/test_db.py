@@ -277,7 +277,7 @@ def test_explore(loop, apool):
 
     loop.run_until_complete(test())
 
-    assert len(db.tables) == 11, pprint.pprint(db.tables)
+    assert len(db.tables) == 12, pprint.pprint(db.tables)
 
     table_1 = [x for x in db.tables if x.full_name == "public.table_1"][0]
     assert len(table_1.child_tables) == 3

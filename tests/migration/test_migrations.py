@@ -1,6 +1,7 @@
 import logging
 import re
 from contextlib import nullcontext
+from typing import Literal
 
 import psycopg
 import pytest
@@ -158,15 +159,15 @@ def test_migrate_no_setup(engine, monkeypatch, aengine, loop, migration_type):
     loop.run_until_complete(_test())
 
 
-def _insert_migrations(engine: psycopg.Connection, nb_migrations: int):
-    up_files = sorted(list(VALID_MIGRATIONS_DIR.glob("*up.sql")))
-    if nb_migrations > (nb_max_migrations := len(up_files)):
+def _insert_migrations(engine: psycopg.Connection, nb_migrations: int, migration_type: Literal["up", "down"] = "up"):
+    _files = sorted(list(VALID_MIGRATIONS_DIR.glob(f"*{migration_type}.sql")))
+    if nb_migrations > (nb_max_migrations := len(_files)):
         raise ValueError(f"Invalid number of migrations {nb_migrations} > {nb_max_migrations}")
 
     _data = [
         {
-            "file_name": up_files[i].name,
-            **parse_filename(up_files[i].name),
+            "file_name": _files[i].name,
+            **parse_filename(_files[i].name),
         }
         for i in range(nb_migrations)
     ]
@@ -214,6 +215,23 @@ def _insert_migrations(engine: psycopg.Connection, nb_migrations: int):
             2,
             ["00000000"],
             id="two rollback with 1 migration only",
+        ),
+        pytest.param(
+            "down",
+            lambda engine: (
+                _insert_migrations(engine, nb_migrations=2),
+                insert_one(
+                    engine,
+                    "migration",
+                    {
+                        "file_name": "2-00000001-down.sql",
+                        **parse_filename("2-00000001-down.sql"),
+                    },
+                ),
+            ),
+            2,
+            ["00000000"],
+            id="rollback a second time",
         ),
     ],
 )
