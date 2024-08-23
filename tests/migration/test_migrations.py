@@ -175,23 +175,31 @@ def _insert_migrations(engine: psycopg.Connection, nb_migrations: int, migration
 
 
 @pytest.mark.parametrize(
-    "migration_type, setup_fn, nb_migrations,expected",
+    "migration_type, setup_fn, params,expected",
     [
-        pytest.param("up", None, 1, ["00000000"], id="one migration up"),
-        pytest.param("down", None, 1, [], id="one migration down with no applied migrations"),
+        pytest.param("up", None, {"nb_migrations": 1}, ["00000000"], id="one migration up"),
+        pytest.param("down", None, {"nb_migrations": 1}, [], id="one migration down with no applied migrations"),
         pytest.param(
-            "down", lambda engine: _insert_migrations(engine, nb_migrations=1), 1, ["00000000"], id="one migration down"
+            "down",
+            lambda engine: _insert_migrations(engine, nb_migrations=1),
+            {"nb_migrations": 1},
+            ["00000000"],
+            id="one migration down",
         ),
-        pytest.param("up", None, -1, ["00000000", "00000001"], id="multiple migrations up"),
+        pytest.param("up", None, {"nb_migrations": -1}, ["00000000", "00000001"], id="multiple migrations up"),
         pytest.param(
             "up",
             lambda engine: _insert_migrations(engine, nb_migrations=1),
-            1,
+            {"nb_migrations": 1},
             ["00000001"],
             id="up with applied migrations",
         ),
         pytest.param(
-            "up", lambda engine: _insert_migrations(engine, nb_migrations=2), 1, [], id="up with no more migrations"
+            "up",
+            lambda engine: _insert_migrations(engine, nb_migrations=2),
+            {"nb_migrations": 1},
+            [],
+            id="up with no more migrations",
         ),
         pytest.param(
             "up",
@@ -205,14 +213,14 @@ def _insert_migrations(engine: psycopg.Connection, nb_migrations: int, migration
                     },
                 )
             ),
-            1,
+            {"nb_migrations": 1},
             [],
             id="up with missing intermediate migration",
         ),
         pytest.param(
             "down",
             lambda engine: _insert_migrations(engine, nb_migrations=1),
-            2,
+            {"nb_migrations": 2},
             ["00000000"],
             id="two rollback with 1 migration only",
         ),
@@ -229,14 +237,35 @@ def _insert_migrations(engine: psycopg.Connection, nb_migrations: int, migration
                     },
                 ),
             ),
-            2,
+            {"nb_migrations": 2},
             ["00000000"],
             id="rollback a second time",
+        ),
+        pytest.param(
+            "down",
+            lambda engine: _insert_migrations(engine, nb_migrations=2),
+            {"migration_id": "00000000"},
+            ["00000001", "00000000"],
+            id="rollback until 00000000",
+        ),
+        pytest.param(
+            "down",
+            lambda engine: _insert_migrations(engine, nb_migrations=2),
+            {"migration_id": "00000001"},
+            ["00000001"],
+            id="rollback until 00000001",
+        ),
+        pytest.param(
+            "down",
+            lambda engine: _insert_migrations(engine, nb_migrations=2),
+            {"migration_id": "toto"},
+            pytest.raises(ValueError, match="Could not find migration_id"),
+            id="rollback until not found",
         ),
     ],
 )
 @pytest.mark.usefixtures("clean_migration", "setup")
-def test_migration_files(engine, aengine, loop, migration_type, setup_fn, nb_migrations, expected):
+def test_migration_files(engine, aengine, loop, migration_type, setup_fn, params, expected):
     if setup_fn is not None:
         setup_fn(engine)
 
@@ -245,11 +274,13 @@ def test_migration_files(engine, aengine, loop, migration_type, setup_fn, nb_mig
     fn = get_migration_files if migration_type == "up" else get_rollback_files
 
     async def _test():
-        _files = await fn(aengine, folder=VALID_MIGRATIONS_DIR, nb_migrations=nb_migrations)
+        _files = await fn(aengine, folder=VALID_MIGRATIONS_DIR, **params)
         return _files
 
-    files = loop.run_until_complete(_test())
-    assert [x.file_id for x in files] == expected
+    _expected = nullcontext(expected) if isinstance(expected, list) else expected
+    with _expected as e:
+        files = loop.run_until_complete(_test())
+        assert [x.file_id for x in files] == e
 
 
 @pytest.mark.usefixtures("clean_migration", "setup_test_schema")

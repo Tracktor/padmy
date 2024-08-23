@@ -82,12 +82,13 @@ async def migrate_up_main(
 async def migrate_down_main(
     conn: Connection = Derived(get_pg),
     sql_dir: Path = MigrationDir,
-    nb_rollbacks: int = Option(1, "-n", "--nb-rollbacks", help="Number of rollbacks to apply"),
+    nb_rollbacks: int | None = Option(None, "-n", "--nb-rollbacks", help="Number of rollbacks to apply"),
+    migration_id: str | None = Option(None, "-m", "--migration-id", help="Migration id to rollback to"),
 ):
     from .migration import migrate_down, NoSetupTableError
 
     try:
-        await migrate_down(conn, folder=sql_dir, nb_migrations=nb_rollbacks)
+        await migrate_down(conn, folder=sql_dir, migration_id=migration_id, nb_migrations=nb_rollbacks)
     except NoSetupTableError as e:
         logs.critical(e, exc_info=False)
 

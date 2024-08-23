@@ -285,7 +285,13 @@ async def get_applied_migrations(conn: asyncpg.Connection) -> list[AppliedMigrat
     ]
 
 
-async def get_rollback_files(conn: asyncpg.Connection, folder: Path, *, nb_migrations: int = -1) -> list[MigrationFile]:
+async def get_rollback_files(
+    conn: asyncpg.Connection,
+    folder: Path,
+    *,
+    nb_migrations: int = -1,
+    migration_id: str | None = None,
+) -> list[MigrationFile]:
     applied_migrations = await get_applied_migrations(conn)
     applied_migration_ids = {item["file_id"] for item in applied_migrations if not item["has_applied_rollback"]}
     rollback_to_apply = [
@@ -293,7 +299,15 @@ async def get_rollback_files(conn: asyncpg.Connection, folder: Path, *, nb_migra
         for _up_file, _down_file in iter_migration_files(get_files(folder))
         if _down_file.file_id in applied_migration_ids
     ][::-1]
-    if nb_migrations > 0:
+
+    if migration_id is not None:
+        for idx, _rollback in enumerate(rollback_to_apply):
+            if _rollback.file_id == migration_id:
+                rollback_to_apply = rollback_to_apply[: idx + 1]
+                break
+        else:
+            raise ValueError(f"Could not find migration_id {migration_id!r}")
+    elif nb_migrations > 0:
         rollback_to_apply = rollback_to_apply[:nb_migrations]
 
     return rollback_to_apply
@@ -303,15 +317,17 @@ async def migrate_down(
     conn: Connection,
     folder: Path,
     *,
-    nb_migrations: int = -1,
+    nb_migrations: int | None = None,
     metadata: dict | None = None,
     use_transaction: bool = True,
-    # migration_id: str = None
-) -> False:
+    migration_id: str | None = None,
+) -> bool:
     """
-    Rollback `nb_migrations` back (default -1 for all available)
+    Rollback `nb_migrations` back (default -1 for all available) or until migration_id (if set)
     """
-    rollback_files = await get_rollback_files(conn, folder, nb_migrations=nb_migrations)
+    rollback_files = await get_rollback_files(
+        conn, folder, migration_id=migration_id, nb_migrations=nb_migrations or -1
+    )
     nb_files = len(rollback_files)
     if nb_files == 0:
         logs.info("No rollback files to apply")
