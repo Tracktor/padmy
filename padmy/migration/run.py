@@ -146,7 +146,7 @@ def verify_files(
 
 @migration.command(cmd="reorder-files", help="Reorder the files")
 def reorder_files(
-    sql_dir: Path = MigrationDir,
+    migrations_dir: Path = MigrationDir,
     output_dir: Path | None = Option(
         None, "--output-dir", "-o", help="Output directory", raise_path_does_not_exist=False
     ),
@@ -156,4 +156,4 @@ def reorder_files(
 
     print(last_commits)
     print(output_dir)
-    reorder_files(sql_dir, output_dir, last_commits or [])
+    reorder_files(migrations_dir, output_dir or migrations_dir, last_commits or [])
