@@ -53,6 +53,11 @@ class MigrationFile:
     path: Path
     header: Header | None = None
 
+    def replace_ts(self, ts: dt.datetime):
+        self.ts = ts
+        new_path = self.path.with_name(f"{int(self.ts.timestamp())}-{self.file_id}-{self.file_type}.sql")
+        self.path.rename(new_path)
+
 
 def parse_filename(filename: str) -> dict:
     ts, file_id, file_type = filename.split("-")
@@ -64,10 +69,11 @@ def parse_filename(filename: str) -> dict:
     return infos
 
 
-def get_files(folder: Path, reverse: bool = False) -> list[MigrationFile]:
+def get_files(folder: Path, reverse: bool = False, up_only: bool = False) -> list[MigrationFile]:
     """Returns the migration files in ascending order"""
     files = []
-    for file in folder.glob("*.sql"):
+    pattern = "*.sql" if not up_only else "*-up.sql"
+    for file in folder.glob(pattern):
         filename_infos = parse_filename(file.name)
         header = Header.from_text(file.read_text())
         files.append(
@@ -135,3 +141,7 @@ def verify_migration_files(migration_dir: Path, *, raise_error: bool = True):
         prev_files = _file
 
     return has_errors
+
+
+def utc_now():
+    return dt.datetime.now(dt.UTC).replace(tzinfo=None)

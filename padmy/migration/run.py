@@ -142,3 +142,18 @@ def verify_files(
         raise CommandError("Files are not correctly ordered")
     else:
         CONSOLE.print("[green]Files are correctly ordered[/green]")
+
+
+@migration.command(cmd="reorder-files", help="Reorder the files")
+def reorder_files(
+    sql_dir: Path = MigrationDir,
+    output_dir: Path | None = Option(
+        None, "--output-dir", "-o", help="Output directory", raise_path_does_not_exist=False
+    ),
+    last_commits: list[str] = Option(None, "--last-commits", "-l", help="Last commits"),
+):
+    from .reorder import reorder_files
+
+    print(last_commits)
+    print(output_dir)
+    reorder_files(sql_dir, output_dir, last_commits or [])
