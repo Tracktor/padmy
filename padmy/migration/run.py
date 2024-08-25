@@ -1,4 +1,5 @@
 import os
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -153,7 +154,18 @@ def reorder_files(
     last_commits: list[str] = Option(None, "--last-commits", "-l", help="Last commits"),
 ):
     from .reorder import reorder_files
+    from .utils import verify_migration_files
 
-    print(last_commits)
-    print(output_dir)
-    reorder_files(migrations_dir, output_dir or migrations_dir, last_commits or [])
+    folder = migrations_dir
+    # Creating the output dir
+    if output_dir is not None:
+        if output_dir.exists():
+            shutil.rmtree(output_dir)
+        shutil.copytree(migrations_dir, output_dir)
+        folder = output_dir
+
+    reorder_files(folder, last_commits=last_commits or [])
+    try:
+        verify_migration_files(folder)
+    except ValueError as e:
+        raise CommandError(str(e))

@@ -7,7 +7,7 @@ else:
     from pytz import UTC
 
 import dataclasses
-
+import textwrap
 from itertools import groupby
 from operator import attrgetter
 from pathlib import Path
@@ -44,6 +44,17 @@ class Header:
                 version = line.split(":")[1].strip()
         return cls(prev_file, author, version)
 
+    def as_text(self):
+        _header = [
+            f"-- Prev-file: {self.prev_file or ''}",
+            f"-- Author: {self.author or ''}",
+        ]
+        if self.version is not None:
+            _header.append(f"-- Version: {self.version}")
+
+        file_header = textwrap.dedent("\n".join(_header)).strip()
+        return file_header
+
 
 @dataclasses.dataclass
 class MigrationFile:
@@ -56,7 +67,15 @@ class MigrationFile:
     def replace_ts(self, ts: dt.datetime):
         self.ts = ts
         new_path = self.path.with_name(f"{int(self.ts.timestamp())}-{self.file_id}-{self.file_type}.sql")
-        self.path.rename(new_path)
+        self.path = self.path.rename(new_path)
+
+    def write_header(self):
+        if not self.header:
+            return
+        # Remove the first lines starting with --
+        lines = [_line for _line in self.path.read_text().split("\n") if not _line.startswith("-- ")]
+        new_text = self.header.as_text() + "\n" + "\n".join(lines)
+        self.path.write_text(new_text)
 
 
 def parse_filename(filename: str) -> dict:
