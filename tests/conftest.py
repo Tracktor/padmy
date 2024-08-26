@@ -172,3 +172,12 @@ def setup_sample_tables(sample_engine, clean_sample_pg):
     sql_file = STATIC_DIR / "setup.sql"
     sample_engine.execute(sql_file.read_text())
     sample_engine.commit()
+
+
+@pytest.fixture()
+def clean_migration(engine):
+    with engine.cursor() as c:
+        c.execute("DROP TABLE IF EXISTS public.migration")
+    engine.commit()
+
+    yield

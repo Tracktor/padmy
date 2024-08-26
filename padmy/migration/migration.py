@@ -12,16 +12,20 @@ import asyncpg
 from asyncpg import Connection
 from asyncpg.exceptions import UndefinedTableError
 
-from tracktolib.pg import insert_many
+from tracktolib.pg import insert_one
+from tracktolib.utils import get_chunks
 from padmy.logs import logs
 from padmy.utils import exec_file, pg_dump, exec_psql_file
 from .utils import get_files, iter_migration_files, MigrationFile
 
-_GET_LATEST_COMMIT_QUERY = """
-SELECT file_ts, file_name, file_id
-FROM public.migration
-ORDER BY applied_at DESC, file_ts DESC
-LIMIT 1
+_GET_LATEST_MIGRATION_QUERY = """
+SELECT _m.file_ts, _m.file_name, _m.file_id
+FROM public.migration _m
+         left join public.migration _r on _r.migration_type = 'down' and _r.file_id = _m.file_id
+where _m.migration_type = 'up'
+  and _r.file_id is null
+order by _m.applied_at desc, file_ts desc
+limit 1
 """
 
 # PG_GLOBAL_DUMP_DIR = GLOBAL_TMP / 'matching-pg-backup' / 'dump'
@@ -180,7 +184,7 @@ class NoSetupTableError(Exception):
 
 async def _get_latest_migration(conn: Connection):
     try:
-        resp = await conn.fetchrow(_GET_LATEST_COMMIT_QUERY)
+        resp = await conn.fetchrow(_GET_LATEST_MIGRATION_QUERY)
     except UndefinedTableError as e:
         if 'relation "public.migration" does not exist' in str(e):
             raise NoSetupTableError(
@@ -215,6 +219,24 @@ async def get_migration_files(
     return migrations_to_apply
 
 
+async def apply_migration(conn: asyncpg.Connection, migration: MigrationFile, metadata: dict | None = None):
+    logs.info(f"Running {migration.path.name} (ts: {migration.ts})...")
+    try:
+        await exec_file(conn, migration.path)
+    except Exception as e:
+        logs.error(f'Failed to execute migration_id "{migration.file_id}" ({e})')
+        raise e
+    migration_data = {
+        "file_ts": migration.ts,
+        "file_id": migration.file_id,
+        "migration_type": "up",
+        "file_name": migration.path.name,
+    }
+    if metadata:
+        migration_data["meta"] = metadata
+    await insert_one(conn, "public.migration", migration_data)
+
+
 async def migrate_up(
     conn: Connection,
     folder: Path,
@@ -236,22 +258,7 @@ async def migrate_up(
     logs.info(f"Found {len(migration_files)} migrations to apply")
     async with _transaction():
         for _migration in migration_files:
-            logs.info(f"Running {_migration.path.name}...")
-            try:
-                await exec_file(conn, _migration.path)
-            except Exception as e:
-                logs.error(f'Failed to execute migration_id "{_migration.file_id}"')
-                raise e
-            commit_data = {
-                "file_ts": _migration.ts,
-                "file_id": _migration.file_id,
-                "migration_type": "up",
-                "file_name": _migration.path.name,
-            }
-            if metadata:
-                commit_data["meta"] = metadata
-            await insert_many(conn, "public.migration", [commit_data])
-
+            await apply_migration(conn, _migration, metadata)
     logs.info("Done!")
     return True
 
@@ -344,15 +351,45 @@ async def migrate_down(
                 logs.error(f'Failed to execute migration_id "{_rollback.file_id}"')
                 raise e
 
-            commit_data = {
+            migration_data = {
                 "file_ts": _rollback.ts,
                 "file_id": _rollback.file_id,
                 "migration_type": "down",
                 "file_name": _rollback.path.name,
             }
             if metadata:
-                commit_data["meta"] = metadata
-            await insert_many(conn, "public.migration", [commit_data])
+                migration_data["meta"] = metadata
+            await insert_one(conn, "public.migration", migration_data)
 
     logs.info("Done!")
     return True
+
+
+async def verify_migrations(conn: asyncpg.Connection, folder: Path, *, chunk_size: int = 500):
+    """
+    Verify that all migrations inside "folder" have been applied to the database.
+    If not, tries to apply them
+    """
+    files = get_files(folder, up_only=True)
+    not_applied_files = []
+    for chunk in get_chunks(files, size=chunk_size, as_list=True):
+        file_ids = await conn.fetch(
+            """
+        SELECT file_id from migration where migration_type = 'up' and file_id = any($1)
+        """,
+            [file.file_id for file in chunk],
+        )
+        file_ids_db = set(file["file_id"] for file in file_ids)
+        for _file in chunk:
+            if _file.file_id not in file_ids_db:
+                not_applied_files.append(_file)
+
+    if not not_applied_files:
+        logs.info("All migrations have been applied")
+        return
+    logs.info(f"Found {len(not_applied_files)} missing files")
+    for _file in not_applied_files:
+        try:
+            await apply_migration(conn, _file, metadata={"missing": True})
+        except Exception:
+            break

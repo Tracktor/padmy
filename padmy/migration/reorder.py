@@ -4,7 +4,7 @@ from .utils import get_files, utc_now, iter_migration_files
 from padmy.logs import logs
 
 
-def reorder_files(folder: Path, last_commits: list[str]):
+def reorder_files(folder: Path, last_migration_ids: list[str]):
     """
     Reorder the migration files given the last N commits (in descending order).
     For instance, let's say we have the following migration files:
@@ -26,22 +26,22 @@ def reorder_files(folder: Path, last_commits: list[str]):
     """
     to_reorder_files = []
     last_commit_files = []
-    _commit_ids = set(last_commits)
+    _migration_ids = set(last_migration_ids)
 
     _last_up_before_reorder, _last_down_before_reorder = None, None
     _prev_down_file, _prev_up_file = None, None
 
     files = get_files(folder, reverse=True)
     for up_file, down_file in iter_migration_files(files):
-        if _prev_up_file is not None and _prev_up_file.file_id == last_commits[-1]:
+        if _prev_up_file is not None and _prev_up_file.file_id == last_migration_ids[-1]:
             _last_up_before_reorder = up_file
             _last_down_before_reorder = down_file
 
-        if not _commit_ids:
+        if not _migration_ids:
             break
 
-        if up_file.file_id in _commit_ids:
-            _commit_ids -= {up_file.file_id}
+        if up_file.file_id in _migration_ids:
+            _migration_ids -= {up_file.file_id}
             last_commit_files.append((up_file, down_file))
         else:
             to_reorder_files.append((up_file, down_file))
@@ -49,7 +49,7 @@ def reorder_files(folder: Path, last_commits: list[str]):
         _prev_up_file, _prev_down_file = up_file, down_file
 
     # Making sure that the files are ordered given the last commits given
-    ordered_last_commits = {commit_id: i for i, commit_id in enumerate(last_commits)}
+    ordered_last_commits = {commit_id: i for i, commit_id in enumerate(last_migration_ids)}
     last_commit_files = sorted(last_commit_files, key=lambda x: ordered_last_commits[x[0].file_id])
     to_reorder_files = to_reorder_files + last_commit_files
 
@@ -60,9 +60,9 @@ def reorder_files(folder: Path, last_commits: list[str]):
     logs.info(f"Found {len(to_reorder_files)} files to reorder")
     for i, (_up_file, _down_file) in enumerate(to_reorder_files):
         # We don't change the timestamp of last commit files
-        if _up_file.file_id not in last_commits:
+        if _up_file.file_id not in last_migration_ids:
             _up_file.replace_ts(_now - dt.timedelta(seconds=i))
-        if _down_file.file_id not in last_commits:
+        if _down_file.file_id not in last_migration_ids:
             _down_file.replace_ts(_now - dt.timedelta(seconds=i))
 
         if _prev_up_file is not None:

@@ -115,9 +115,17 @@ def iter_migration_files(files: list[MigrationFile]):
         _down_files = [x for x in _files if x.file_type == "down"]
 
         if len(_up_files) != 1:
-            raise ValueError(f'Found {len(_up_files)} "up" files')
+            raise ValueError(
+                f'Found {len(_up_files)} "up" files (file_id: {_up_files[0].file_id})'
+                if _up_files
+                else "No up file found"
+            )
         if len(_down_files) != 1:
-            raise ValueError(f'Found {len(_down_files)} "down" files')
+            raise ValueError(
+                f'Found {len(_down_files)} "down" files (file_id: {_down_files[0].file_id})'
+                if _down_files
+                else "No down file found"
+            )
 
         yield _up_files[0], _down_files[0]
 
@@ -128,12 +136,17 @@ def verify_migration_files(migration_dir: Path, *, raise_error: bool = True):
     """
     prev_files = None
     has_errors = False
+    _ids = set()
     for _file in iter_migration_files(get_files(migration_dir)):
         if prev_files is None:
             prev_files = _file
             continue
         prev_up, prev_down = prev_files
         up, down = _file
+
+        if up.file_id in _ids:
+            raise ValueError(f"Duplicate file id {up.file_id}")
+        _ids.add(up.file_id)
 
         try:
             if prev_up.ts > up.ts:

@@ -2,7 +2,7 @@ import logging
 import re
 from contextlib import nullcontext
 from typing import Literal
-
+import datetime as dt
 import psycopg
 import pytest
 
@@ -159,14 +159,23 @@ def test_migrate_no_setup(engine, monkeypatch, aengine, loop, migration_type):
     loop.run_until_complete(_test())
 
 
-def _insert_migrations(engine: psycopg.Connection, nb_migrations: int, migration_type: Literal["up", "down"] = "up"):
-    _files = sorted(list(VALID_MIGRATIONS_DIR.glob(f"*{migration_type}.sql")))
+def _insert_migrations(
+    engine: psycopg.Connection,
+    nb_migrations: int,
+    migration_type: Literal["up", "down"] = "up",
+    *,
+    offset_seconds: int = 0,
+):
+    _files = sorted(list(VALID_MIGRATIONS_DIR.glob(f"*{migration_type}.sql")), reverse=migration_type == "down")
     if nb_migrations > (nb_max_migrations := len(_files)):
         raise ValueError(f"Invalid number of migrations {nb_migrations} > {nb_max_migrations}")
 
+    _now = dt.datetime.now() + dt.timedelta(seconds=offset_seconds)
+    print("Now:", _now)
     _data = [
         {
             "file_name": _files[i].name,
+            "applied_at": _now + dt.timedelta(microseconds=i),
             **parse_filename(_files[i].name),
         }
         for i in range(nb_migrations)
@@ -228,14 +237,7 @@ def _insert_migrations(engine: psycopg.Connection, nb_migrations: int, migration
             "down",
             lambda engine: (
                 _insert_migrations(engine, nb_migrations=2),
-                insert_one(
-                    engine,
-                    "migration",
-                    {
-                        "file_name": "2-00000001-down.sql",
-                        **parse_filename("2-00000001-down.sql"),
-                    },
-                ),
+                _insert_migrations(engine, nb_migrations=1, migration_type="down", offset_seconds=1),
             ),
             {"nb_migrations": 2},
             ["00000000"],
@@ -261,6 +263,37 @@ def _insert_migrations(engine: psycopg.Connection, nb_migrations: int, migration
             {"migration_id": "toto"},
             pytest.raises(ValueError, match="Could not find migration_id"),
             id="rollback until not found",
+        ),
+        pytest.param(
+            "up",
+            lambda engine: (
+                _insert_migrations(engine, nb_migrations=2),
+                _insert_migrations(engine, nb_migrations=1, migration_type="down", offset_seconds=1),
+            ),
+            {"nb_migrations": 1},
+            ["00000001"],
+            id="reapply migration",
+        ),
+        pytest.param(
+            "up",
+            lambda engine: (
+                _insert_migrations(engine, nb_migrations=2),
+                _insert_migrations(engine, nb_migrations=2, migration_type="down"),
+            ),
+            {"nb_migrations": 2},
+            ["00000000", "00000001"],
+            id="reapply migrations",
+        ),
+        pytest.param(
+            "up",
+            lambda engine: (
+                _insert_migrations(engine, nb_migrations=2),
+                _insert_migrations(engine, nb_migrations=2, migration_type="down", offset_seconds=1),
+                _insert_migrations(engine, nb_migrations=1, offset_seconds=2),
+            ),
+            {"nb_migrations": 1},
+            ["00000001"],
+            id="reapply migration a second time",
         ),
     ],
 )

@@ -151,7 +151,7 @@ def reorder_files(
     output_dir: Path | None = Option(
         None, "--output-dir", "-o", help="Output directory", raise_path_does_not_exist=False
     ),
-    last_commits: list[str] = Option(None, "--last-commits", "-l", help="Last commits"),
+    last_migration_ids: list[str] = Option(None, "--ids", "-l", help="Last migration ids (in descending order)"),
 ):
     from .reorder import reorder_files
     from .utils import verify_migration_files
@@ -164,8 +164,18 @@ def reorder_files(
         shutil.copytree(migrations_dir, output_dir)
         folder = output_dir
 
-    reorder_files(folder, last_commits=last_commits or [])
+    reorder_files(folder, last_migration_ids=last_migration_ids or [])
     try:
         verify_migration_files(folder)
     except ValueError as e:
         raise CommandError(str(e))
+
+
+@migration.command(cmd="verify-migrations", help="Verify that the migrations are applied correctly")
+async def verify_migrations(
+    pg_conn: Connection = Derived(get_pg),
+    migrations_dir: Path = MigrationDir,
+):
+    from .migration import verify_migrations
+
+    await verify_migrations(pg_conn, migrations_dir)
