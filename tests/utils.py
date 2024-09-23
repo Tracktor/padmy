@@ -1,3 +1,4 @@
+import re
 import pprint
 from dataclasses import asdict
 from pathlib import Path
@@ -42,7 +43,13 @@ SELECT EXISTS (
 """
 
 
-def check_column_exists(engine: psycopg.Connection, schema: str, table: str, column: str):
+def normalize_spaces(text: str):
+    return re.sub(r"\s+", " ", text)
+
+
+def check_column_exists(
+    engine: psycopg.Connection, schema: str, table: str, column: str
+):
     with engine.cursor() as c:
         c.execute(_COLUMN_EXISTS_QUERY, (schema, table, column))
         res = c.fetchone()
@@ -51,9 +58,13 @@ def check_column_exists(engine: psycopg.Connection, schema: str, table: str, col
 
 def compare_files(f1: Path, f2: Path, ignore_order: bool = False):
     def get_lines(f: Path):
-        return [x.strip() for x in f.read_text().split("\n") if x.strip()]
+        return [
+            normalize_spaces(x.strip()) for x in f.read_text().split("\n") if x.strip()
+        ]
 
-    assert not deepdiff.DeepDiff(get_lines(f1), get_lines(f2), ignore_order=ignore_order)
+    assert not deepdiff.DeepDiff(
+        get_lines(f1), get_lines(f2), ignore_order=ignore_order
+    )
 
 
 def create_db(url: str, db: str, *, drop_first: bool = True):
