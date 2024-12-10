@@ -16,6 +16,16 @@ from padmy.logs import logs
 from padmy.utils import exec_cmd
 
 
+__all__ = (
+    "Header",
+    "MigrationFile",
+    "get_files",
+    "iter_migration_files",
+    "verify_migration_files",
+    "get_git_email",
+)
+
+
 def get_git_email():
     return exec_cmd(["git", "config", "user.email"]).strip()
 
