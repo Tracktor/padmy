@@ -201,6 +201,8 @@ def verify_migration_files(migration_dir: Path, *, raise_error: bool = True):
                 raise e
             logs.warning(e.args[0])
             has_errors = True
+        else:
+            logs.info(f"Valid header for file {up.path.name}")
 
         prev_files = _file
 

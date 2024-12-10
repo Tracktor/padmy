@@ -1,9 +1,8 @@
 from pathlib import Path
 import datetime as dt
-from .utils import get_files, utc_now, iter_migration_files
-from padmy.logs import logs
+from .utils import get_files, utc_now, iter_migration_files, MigrationFile
 
-__all__ = ("reorder_files",)
+__all__ = ("reorder_files", "rename_files")
 
 
 def reorder_files(folder: Path, last_migration_ids: list[str]):
@@ -21,66 +20,67 @@ def reorder_files(folder: Path, last_migration_ids: list[str]):
     the new order will be:
 
             0000_file1.sql
-            0002_file3.sql
-            0004_file5.sql
-            0001_file2.sql
-            0003_file4.sql
+            0001_file2.sql <= last commit -1
+            0003_file4.sql <= last commit
+            0002_file3.sql <= moved after the last commit
+            0004_file5.sql <= moved after the last commit
+
+    This is useful when you have migrations applied on one branch (let's say master) that are not
+    in the same order as the branch you are currently working on (like develop).
+
     """
     if not last_migration_ids:
         return
 
-    to_reorder_files = []
-    last_commit_files = []
     _migration_ids = set(last_migration_ids)
 
-    _last_up_before_reorder, _last_down_before_reorder = None, None
-    _prev_down_file, _prev_up_file = None, None
-
+    to_reorder_files, commit_files, after_files = [], [], []
+    last_up_file, last_down_file = None, None
     files = get_files(folder, reverse=True)
+    # Iterating files to find the one to reorder starting from the most recent migrations
     for up_file, down_file in iter_migration_files(files):
-        if _prev_up_file is not None and _prev_up_file.file_id == last_migration_ids[-1]:
-            _last_up_before_reorder = up_file
-            _last_down_before_reorder = down_file
-
+        # If we don't have any more migrations to reorder, we can stop
         if not _migration_ids:
+            # Saving the last up and down files for the rewrite_headers function later
+            last_up_file, last_down_file = up_file, down_file
             break
 
+        # If we encounter a migration file in the last commits list, we add it to the commit_files list
         if up_file.file_id in _migration_ids:
             _migration_ids -= {up_file.file_id}
-            last_commit_files.append((up_file, down_file))
+            commit_files.append((up_file, down_file))
+            continue
+        # If the size in unchanged, we did not meet any migration file to reoder
+        if len(_migration_ids) == len(last_migration_ids):
+            after_files.append((up_file, down_file))
+        # Otherwise, we add it to the to_reorder_files list
         else:
             to_reorder_files.append((up_file, down_file))
 
-        _prev_up_file, _prev_down_file = up_file, down_file
+    new_order_files = commit_files + to_reorder_files + after_files
 
-    # Making sure that the files are ordered given the last commits given
-    ordered_last_commits = {commit_id: i for i, commit_id in enumerate(last_migration_ids)}
-    last_commit_files = sorted(last_commit_files, key=lambda x: ordered_last_commits[x[0].file_id])
-    to_reorder_files = to_reorder_files + last_commit_files
+    # We rename the files to reflect the new order
+    rename_files(utc_now(), last_migrations=(last_up_file, last_down_file), migration_files=new_order_files)
 
-    # Note: This can cause an issue is for some reason
-    # the last commits are in the future
-    _now = utc_now()
-    _prev_up_file, _prev_down_file = None, None
-    logs.info(f"Found {len(to_reorder_files)} files to reorder")
-    for i, (_up_file, _down_file) in enumerate(to_reorder_files):
-        # We don't change the timestamp of last commit files
-        if _up_file.file_id not in last_migration_ids:
-            _up_file.replace_ts(_now - dt.timedelta(seconds=i))
-        if _down_file.file_id not in last_migration_ids:
-            _down_file.replace_ts(_now - dt.timedelta(seconds=i))
 
-        if _prev_up_file is not None:
-            _prev_up_file.header.prev_file = _up_file.path.name
-            _prev_up_file.write_header()
-        if _prev_down_file is not None:
-            _prev_down_file.header.prev_file = _down_file.path.name
-            _prev_down_file.write_header()
+def rename_files(
+    last_ts: dt.datetime,
+    last_migrations: tuple[MigrationFile | None, MigrationFile | None],
+    migration_files: list[tuple[MigrationFile, MigrationFile]],
+):
+    """
+    Rename the migration files to reflect the new order.
+    Also rewrite the headers accordingly.
+    """
+    _prev_up_file, _prev_down_file = last_migrations
+    for i, (_up_file, _down_file) in enumerate(migration_files):
+        _up_file.replace_ts(last_ts + dt.timedelta(seconds=i))
+        _down_file.replace_ts(last_ts + dt.timedelta(seconds=i))
+        # Rewrite headers
+        if _prev_down_file is not None and _prev_up_file is not None:
+            if _up_file.header is None or _down_file.header is None:
+                raise ValueError("Header is missing")
+            _up_file.header.prev_file, _down_file.header.prev_file = _prev_up_file.path.name, _prev_down_file.path.name
+            _up_file.write_header()
+            _down_file.write_header()
         _prev_up_file, _prev_down_file = _up_file, _down_file
-
-    if _last_up_before_reorder is not None and _prev_up_file is not None:
-        _prev_up_file.header.prev_file = _last_up_before_reorder.path.name
-        _prev_up_file.write_header()
-    if _last_down_before_reorder is not None and _prev_down_file is not None:
-        _prev_down_file.header.prev_file = _last_down_before_reorder.path.name
-        _prev_down_file.write_header()

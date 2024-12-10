@@ -9,9 +9,7 @@ DEFAULT_TIME = dt.datetime(2024, 1, 1, 0, 0, 0)
 
 @pytest.fixture()
 def migration_folder(tmp_path):
-    print(tmp_path)
     return tmp_path
-    # return Path(tempfile.gettempdir())
 
 
 @pytest.fixture()
@@ -45,10 +43,14 @@ def setup_migration_folder(migration_folder):
 
 _empty_folder = pytest.param(None, [], ["0000000", "0000001", "0000002", "0000003", "0000004"], id="empty folder")
 
+_one_file_change = pytest.param(
+    None, ["0000002", "0000004"], ["0000000", "0000001", "0000004", "0000002", "0000003"], id="one file change"
+)
+
 
 @pytest.mark.usefixtures("setup_migration_folder")
-@pytest.mark.parametrize("setup_fn, last_migration_ids, expected", [_empty_folder])
-def test_reorder(setup_fn, last_migration_ids, expected, migration_folder):
+@pytest.mark.parametrize("setup_fn, last_migration_ids, expected", [_empty_folder, _one_file_change])
+def test_reorder(setup_fn, last_migration_ids, migration_folder, expected):
     from padmy.migration import reorder_files, verify_migration_files
 
     if setup_fn is not None:
