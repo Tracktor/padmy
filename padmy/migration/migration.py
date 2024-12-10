@@ -3,23 +3,29 @@ import datetime as dt
 import difflib
 import filecmp
 import functools
+import typing
 from contextlib import nullcontext
 from pathlib import Path
 from typing import Callable, Iterator
 
+import asyncpg
 from asyncpg import Connection
 from asyncpg.exceptions import UndefinedTableError
+from tracktolib.pg import insert_one
+from tracktolib.utils import get_chunks
 
-from tracktolib.pg import insert_many
 from padmy.logs import logs
 from padmy.utils import exec_file, pg_dump, exec_psql_file
 from .utils import get_files, iter_migration_files, MigrationFile
 
-_GET_LATEST_COMMIT_QUERY = """
-SELECT file_ts, file_name, file_id
-FROM public.migration
-ORDER BY applied_at DESC, file_ts DESC
-LIMIT 1
+_GET_LATEST_MIGRATION_QUERY = """
+SELECT _m.file_ts, _m.file_name, _m.file_id
+FROM public.migration _m
+         left join public.migration _r on _r.migration_type = 'down' and _r.file_id = _m.file_id
+where _m.migration_type = 'up'
+  and _r.file_id is null
+order by _m.applied_at desc, file_ts desc
+limit 1
 """
 
 # PG_GLOBAL_DUMP_DIR = GLOBAL_TMP / 'matching-pg-backup' / 'dump'
@@ -178,7 +184,7 @@ class NoSetupTableError(Exception):
 
 async def _get_latest_migration(conn: Connection):
     try:
-        resp = await conn.fetchrow(_GET_LATEST_COMMIT_QUERY)
+        resp = await conn.fetchrow(_GET_LATEST_MIGRATION_QUERY)
     except UndefinedTableError as e:
         if 'relation "public.migration" does not exist' in str(e):
             raise NoSetupTableError(
@@ -190,17 +196,9 @@ async def _get_latest_migration(conn: Connection):
     return LatestMigration.load(dict(resp)) if resp else None
 
 
-async def migrate_up(
-    conn: Connection,
-    folder: Path,
-    *,
-    nb_migrations: int = -1,
-    metadata: dict | None = None,
-    use_transaction: bool = True,
-):
-    """Migrate from the latest migration applied available in the database
-    to the latest one in the `folder` dir.
-    """
+async def get_migration_files(
+    conn: asyncpg.Connection, folder: Path, *, nb_migrations: int = -1
+) -> list[MigrationFile]:
     latest_migration = await _get_latest_migration(conn)
     logs.info(
         f"Latest timestamp: {latest_migration.timestamp} ({latest_migration.file_id})"
@@ -212,74 +210,143 @@ async def migrate_up(
     migrations_to_apply = [
         _up_file
         for _up_file, _ in iter_migration_files(migration_files)
-        if latest_migration is None
+        if (latest_migration is None)
         or (_up_file.ts >= latest_migration.timestamp and _up_file.path.name != latest_migration.file_name)
     ]
+
     if nb_migrations > 0:
         migrations_to_apply = migrations_to_apply[:nb_migrations]
-
-    if not migrations_to_apply:
-        logs.info("No migrations to apply")
-        return
-
-    _transaction = conn.transaction if use_transaction else nullcontext
-    logs.info(f"Found {len(migrations_to_apply)} migrations to apply")
-    async with _transaction():
-        for _migration in migrations_to_apply:
-            logs.info(f"Running {_migration.path.name}...")
-            try:
-                await exec_file(conn, _migration.path)
-            except Exception as e:
-                logs.error(f'Failed to execute migration_id "{_migration.file_id}"')
-                raise e
-            commit_data = {
-                "file_ts": _migration.ts,
-                "file_id": _migration.file_id,
-                "migration_type": "up",
-                "file_name": _migration.path.name,
-            }
-            if metadata:
-                commit_data["meta"] = metadata
-            await insert_many(conn, "public.migration", [commit_data])
-
-    logs.info("Done!")
+    return migrations_to_apply
 
 
-async def migrate_down(
+async def apply_migration(conn: asyncpg.Connection, migration: MigrationFile, metadata: dict | None = None):
+    logs.info(f"Running {migration.path.name} (ts: {migration.ts})...")
+    try:
+        await exec_file(conn, migration.path)
+    except Exception as e:
+        logs.error(f'Failed to execute migration_id "{migration.file_id}" ({e})')
+        raise e
+    migration_data = {
+        "file_ts": migration.ts,
+        "file_id": migration.file_id,
+        "migration_type": "up",
+        "file_name": migration.path.name,
+    }
+    if metadata:
+        migration_data["meta"] = metadata
+    await insert_one(conn, "public.migration", migration_data)
+
+
+async def migrate_up(
     conn: Connection,
     folder: Path,
     *,
     nb_migrations: int = -1,
     metadata: dict | None = None,
     use_transaction: bool = True,
-    # migration_id: str = None
-):
+) -> bool:
+    """Migrate from the latest migration applied available in the database
+    to the latest one in the `folder` dir.
     """
-    Rollback `nb_migrations` back (default -1 for all available)
-    """
-    latest_migration = await _get_latest_migration(conn)
+    migration_files = await get_migration_files(conn, folder, nb_migrations=nb_migrations)
 
-    migration_files = get_files(folder, reverse=True)
+    if not migration_files:
+        logs.info("No migrations to apply")
+        return False
 
-    rollback_to_apply = [
-        _down_file
-        for _, _down_file in iter_migration_files(migration_files)
-        if latest_migration is None
-        or (_down_file.ts <= latest_migration.timestamp and _down_file.path.name != latest_migration.file_name)
+    _transaction = conn.transaction if use_transaction else nullcontext
+    logs.info(f"Found {len(migration_files)} migrations to apply")
+    async with _transaction():
+        for _migration in migration_files:
+            await apply_migration(conn, _migration, metadata)
+    logs.info("Done!")
+    return True
+
+
+class AppliedMigration(typing.TypedDict):
+    file_id: str
+    has_applied_rollback: bool
+
+
+async def get_applied_migrations(conn: asyncpg.Connection) -> list[AppliedMigration]:
+    try:
+        data = await conn.fetch(
+            """
+            SELECT _m.file_id, _r.file_id is not null as has_applied_rollback
+            FROM public.migration _m
+                     left join public.migration _r on _r.migration_type = 'down' and _r.file_id = _m.file_id
+            where _m.migration_type = 'up'
+            order by _m.applied_at desc
+            """
+        )
+    except UndefinedTableError as e:
+        if 'relation "public.migration" does not exist' in str(e):
+            raise NoSetupTableError(
+                'Could not find table table "public.migration", did you forget to setup the table'
+                ' by running "migration setup" ?'
+            )
+        else:
+            raise
+    return [
+        AppliedMigration(file_id=item["file_id"], has_applied_rollback=item["has_applied_rollback"]) for item in data
     ]
 
-    if nb_migrations > 0:
+
+async def get_rollback_files(
+    conn: asyncpg.Connection,
+    folder: Path,
+    *,
+    nb_migrations: int = -1,
+    migration_id: str | None = None,
+) -> list[MigrationFile]:
+    if migration_id is not None and nb_migrations >= 0:
+        raise ValueError('Specify either "nb_migrations" or "migration_id"')
+
+    applied_migrations = await get_applied_migrations(conn)
+    applied_migration_ids = {item["file_id"] for item in applied_migrations if not item["has_applied_rollback"]}
+    rollback_to_apply = [
+        _down_file
+        for _up_file, _down_file in iter_migration_files(get_files(folder))
+        if _down_file.file_id in applied_migration_ids
+    ][::-1]
+
+    if migration_id is not None:
+        for idx, _rollback in enumerate(rollback_to_apply):
+            if _rollback.file_id == migration_id:
+                rollback_to_apply = rollback_to_apply[: idx + 1]
+                break
+        else:
+            raise ValueError(f"Could not find migration_id {migration_id!r}")
+    elif nb_migrations > 0:
         rollback_to_apply = rollback_to_apply[:nb_migrations]
 
-    nb_files = len(rollback_to_apply)
+    return rollback_to_apply
+
+
+async def migrate_down(
+    conn: Connection,
+    folder: Path,
+    *,
+    nb_migrations: int | None = None,
+    metadata: dict | None = None,
+    use_transaction: bool = True,
+    migration_id: str | None = None,
+) -> bool:
+    """
+    Rollback `nb_migrations` back (default -1 for all available) or until migration_id (if set)
+    """
+    rollback_files = await get_rollback_files(
+        conn, folder, migration_id=migration_id, nb_migrations=nb_migrations or -1
+    )
+    nb_files = len(rollback_files)
     if nb_files == 0:
         logs.info("No rollback files to apply")
-        return
+        return False
 
     _transaction = conn.transaction if use_transaction else nullcontext
     logs.info(f"Found {nb_files} rollback files to apply")
     async with _transaction():
-        for _rollback in rollback_to_apply:
+        for _rollback in rollback_files:
             logs.info(f"Running {_rollback.path.name}...")
             try:
                 await exec_file(conn, _rollback.path)
@@ -287,14 +354,47 @@ async def migrate_down(
                 logs.error(f'Failed to execute migration_id "{_rollback.file_id}"')
                 raise e
 
-            commit_data = {
+            migration_data = {
                 "file_ts": _rollback.ts,
                 "file_id": _rollback.file_id,
                 "migration_type": "down",
                 "file_name": _rollback.path.name,
             }
             if metadata:
-                commit_data["meta"] = metadata
-            await insert_many(conn, "public.migration", [commit_data])
+                migration_data["meta"] = metadata
+            await insert_one(conn, "public.migration", migration_data)
 
     logs.info("Done!")
+    return True
+
+
+async def get_missing_migrations(conn: asyncpg.Connection, folder: Path, *, chunk_size: int = 500):
+    files = get_files(folder, up_only=True)
+    not_applied_files = []
+    for chunk in get_chunks(files, size=chunk_size, as_list=True):
+        file_ids = await conn.fetch(
+            """
+        SELECT file_id from migration where migration_type = 'up' and file_id = any($1)
+        """,
+            [file.file_id for file in chunk],
+        )
+        file_ids_db = set(file["file_id"] for file in file_ids)
+        for _file in chunk:
+            if _file.file_id not in file_ids_db:
+                not_applied_files.append(_file)
+
+    return not_applied_files
+
+
+async def verify_migrations(conn: asyncpg.Connection, folder: Path, *, chunk_size: int = 500):
+    """
+    Verify that all migrations inside "folder" have been applied to the database.
+    If not, tries to apply them
+    """
+    not_applied_files = await get_missing_migrations(conn, folder=folder, chunk_size=chunk_size)
+    if not not_applied_files:
+        logs.info("All migrations have been applied")
+        return
+    logs.info(f"Found {len(not_applied_files)} missing files")
+    for _file in not_applied_files:
+        await apply_migration(conn, _file, metadata={"missing": True})

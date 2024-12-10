@@ -44,7 +44,7 @@ executors:
       - image: cimg/python:3.10.12-node
         environment:
           PYRIGHT_PYTHON_GLOBAL_NODE: true
-      - image: cimg/postgres:14.9-postgis
+      - image: cimg/postgres:17.0-postgis
         environment:
           POSTGRES_PASSWORD: postgres
 
@@ -64,7 +64,7 @@ jobs:
             sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
             # Import the repository signing key:
             wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
-            sudo apt-get update && sudo apt-get install postgresql-client-14
+            sudo apt-get update && sudo apt-get install postgresql-client-17
       - sre/run-python-tests:
           extras: '--all-extras --quiet'
           formatter: 'ruff'
@@ -97,41 +97,7 @@ jobs:
 
   # Publish
 
-  build-publish-docker-14:
-    executor: build-docker
-    steps:
-      - setup_remote_docker:
-          docker_layer_caching: true
-      - checkout
-      - attach_workspace:
-          at: .
-      - sre/load-poetry-version
-      - sre/build-docker:
-          dockerfile: './docker/pg-14/Dockerfile'
-          image_name: 'tracktor/padmy'
-          tag: ${VERSION}-14
-          latest_tag: 'latest-14'
-          publish: true
-          registry_pwd: $CONTAINER_REGISTRY_PWD
-          registry_user: $CONTAINER_REGISTRY_USER
-
-  build-publish-docker-network-14:
-    executor: build-docker
-    steps:
-      - setup_remote_docker:
-          docker_layer_caching: true
-      - checkout
-      - attach_workspace:
-          at: .
-      - sre/load-poetry-version
-      - sre/build-docker:
-          dockerfile: './docker/pg-14/Dockerfile'
-          image_name: 'tracktor/padmy'
-          tag: ${VERSION}-network-14
-          latest_tag: 'latest-network-14'
-          publish: true
-          registry_pwd: $CONTAINER_REGISTRY_PWD
-          registry_user: $CONTAINER_REGISTRY_USER
+  ## PG 15
 
   build-publish-docker-15:
     executor: build-docker
@@ -169,6 +135,7 @@ jobs:
           registry_pwd: $CONTAINER_REGISTRY_PWD
           registry_user: $CONTAINER_REGISTRY_USER
 
+  ## PG 16
 
   build-publish-docker-16:
     executor: build-docker
@@ -205,6 +172,45 @@ jobs:
           publish: true
           registry_pwd: $CONTAINER_REGISTRY_PWD
           registry_user: $CONTAINER_REGISTRY_USER
+
+  ## PG 17
+
+  build-publish-docker-17:
+    executor: build-docker
+    steps:
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - checkout
+      - attach_workspace:
+          at: .
+      - sre/load-poetry-version
+      - sre/build-docker:
+          dockerfile: './docker/pg-17/Dockerfile'
+          image_name: 'tracktor/padmy'
+          tag: ${VERSION}-17
+          latest_tag: 'latest-17'
+          publish: true
+          registry_pwd: $CONTAINER_REGISTRY_PWD
+          registry_user: $CONTAINER_REGISTRY_USER
+
+  build-publish-docker-network-17:
+    executor: build-docker
+    steps:
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - checkout
+      - attach_workspace:
+          at: .
+      - sre/load-poetry-version
+      - sre/build-docker:
+          dockerfile: './docker/pg-17/Dockerfile'
+          image_name: 'tracktor/padmy'
+          tag: ${VERSION}-network-17
+          latest_tag: 'latest-network-17'
+          publish: true
+          registry_pwd: $CONTAINER_REGISTRY_PWD
+          registry_user: $CONTAINER_REGISTRY_USER
+
 
   # Bump
 
@@ -267,18 +273,6 @@ workflows:
           filters: *filters_only_tags
       - export-requirements-network:
           filters: *filters_only_tags
-      - build-publish-docker-14:
-          requires: [
-            export-requirements
-          ]
-          context: *production_context
-          filters: *filters_only_tags
-      - build-publish-docker-network-14:
-          requires: [
-            export-requirements-network
-          ]
-          context: *production_context
-          filters: *filters_only_tags
       - build-publish-docker-15:
           requires: [
             export-requirements
@@ -298,6 +292,18 @@ workflows:
           context: *production_context
           filters: *filters_only_tags
       - build-publish-docker-network-16:
+          requires: [
+            export-requirements-network
+          ]
+          context: *production_context
+          filters: *filters_only_tags
+      - build-publish-docker-17:
+          requires: [
+            export-requirements
+          ]
+          context: *production_context
+          filters: *filters_only_tags
+      - build-publish-docker-network-17:
           requires: [
             export-requirements-network
           ]

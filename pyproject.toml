@@ -25,7 +25,7 @@ pyright = "^1.1.352"
 pytest = "^7.1.2"
 pytest-cov = "^4.0.0"
 deepdiff = "^5.8.1"
-ruff = "^0.1.6"
+ruff = "^0.8.2"
 commitizen = "^3.13.0"
 psycopg = "^3.1.12"
 tracktolib = { version = ">=0.41.0", extras = ["pg-sync"] }
@@ -68,20 +68,18 @@ bump_message = "release $current_version → $new_version [skip ci]"
 line-length = 120
 target-version = "py310"
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "__init__.py" = [
     # imported but unused
     "F401",
     # unable to detect undefined names
-    "F403",
-    #
-    "F405"
+    "F403"
 ]
 
-[tool.ruff.flake8-quotes]
+[tool.ruff.lint.flake8-quotes]
 docstring-quotes = "double"
 inline-quotes = "single"
 
-[tool.ruff.flake8-tidy-imports]
+[tool.ruff.lint.flake8-tidy-imports]
 # Disallow all relative imports.
 ban-relative-imports = "all"

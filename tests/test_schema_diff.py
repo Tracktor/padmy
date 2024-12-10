@@ -77,7 +77,7 @@ def diffs(no_diffs, engine_to):
             [
                 "--- from_db-from.sql\n",
                 "+++ to_db-to.sql\n",
-                "@@ -44,7 +44,8 @@\n",
+                "@@ -45,7 +45,8 @@\n",
                 " CREATE TABLE schema1.table_1 (",
                 "     id integer NOT NULL,",
                 "-    foo text NOT NULL",

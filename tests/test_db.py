@@ -266,7 +266,7 @@ def test_get_columns(loop, engine, aengine, table, expected):
     print(columns)
 
 
-@pytest.mark.usefixtures("setup_tables")
+@pytest.mark.usefixtures("setup_tables", "clean_migration")
 def test_explore(loop, apool):
     from padmy.db import Database
 

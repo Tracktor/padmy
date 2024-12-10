@@ -12,22 +12,9 @@ def migration_dir(tmp_path):
         yield Path(tmp_dir) / "migration"
 
 
-@pytest.fixture()
-def clean_migration(engine):
-    with engine.cursor() as c:
-        c.execute("DROP TABLE IF EXISTS public.migration")
-    engine.commit()
-
-    yield
-
-    with engine.cursor() as c:
-        c.execute("DROP TABLE IF EXISTS public.migration")
-    engine.commit()
-
-
 VALID_MIGRATIONS_DIR = STATIC_DIR / "migrations" / "valid"
 INVALID_MIGRATIONS_DIR = STATIC_DIR / "migrations" / "invalid-simple"
-INVALID_MIGRATIONS_DIR_MULTIPLE = STATIC_DIR / "migrations" / "invalid-multiple"
+INVALID_MIGRATIONS_DIR_MULTIPLE: Path = STATIC_DIR / "migrations" / "invalid-multiple"
 
 
 @pytest.fixture()

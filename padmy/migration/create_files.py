@@ -1,15 +1,14 @@
-import textwrap
 import time
-import uuid
 from pathlib import Path
 
 from rich.markup import escape
 from rich.prompt import Prompt
 
-from padmy.logs import logs
-from .utils import get_files, iter_migration_files
-from .config import MigrationConfig
 from padmy.env import CONSOLE
+from padmy.logs import logs
+from .migration import MigrationFile
+from .config import MigrationConfig
+from .utils import get_files, iter_migration_files, Header
 
 
 def _get_user_email() -> str | None:
@@ -35,7 +34,7 @@ def create_new_migration(folder: Path, version: str | None = None) -> tuple[Path
     """
     folder.mkdir(exist_ok=True, parents=True)
 
-    _base_name = f"{int(time.time())}-{str(uuid.uuid4())[:8]}"
+    _base_name = MigrationFile.generate_base_name(ts=int(time.time()))
     CONSOLE.print(f"\nCreating new migration file ([green]{escape(_base_name)}[/green]):\n")
 
     last_migration = _get_last_migration_name(folder)
@@ -46,17 +45,9 @@ def create_new_migration(folder: Path, version: str | None = None) -> tuple[Path
     up_file = folder / Path(f"{_base_name}-up.sql")
     down_file = folder / Path(f"{_base_name}-down.sql")
 
-    _header = [
-        f"-- Prev-file: {last_migration or ''}",
-        f"-- Author: {author or ''}",
-    ]
-    if version:
-        _header.append(f"-- Version: {version}")
-
-    file_header = textwrap.dedent("\n".join(_header)).strip()
-
-    up_file.write_text(file_header)
-    down_file.write_text(file_header.replace("-up", "-down"))
+    _header = Header(last_migration, author, version).as_text()
+    up_file.write_text(_header)
+    down_file.write_text(_header.replace("-up", "-down"))
 
     CONSOLE.print("\nNew files created!\n")
     return up_file, down_file

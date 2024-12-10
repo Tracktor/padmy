@@ -3,7 +3,7 @@ version: "3.0"
 services:
 
   postgres:
-    image: postgis/postgis:14-3.2-alpine
+    image: postgis/postgis:17-3.4-alpine
     container_name: pg_dev
     ports:
       - "5432:5432"

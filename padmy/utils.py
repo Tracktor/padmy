@@ -37,7 +37,9 @@ def get_pg_url(pg_url: str = Derived(get_pg_root), pg_database: str = PgDatabase
 
 
 async def get_pg(pg_url: str = Derived(get_pg_url)):
-    return await asyncpg.connect(pg_url)
+    _conn = await asyncpg.connect(pg_url)
+    await init_connection(_conn)
+    return _conn
 
 
 OnStdErrorFn = Callable[[str], None]

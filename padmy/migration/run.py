@@ -1,4 +1,5 @@
 import os
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -82,12 +83,13 @@ async def migrate_up_main(
 async def migrate_down_main(
     conn: Connection = Derived(get_pg),
     sql_dir: Path = MigrationDir,
-    nb_rollbacks: int = Option(1, "-n", "--nb-rollbacks", help="Number of rollbacks to apply"),
+    nb_rollbacks: int | None = Option(None, "-n", "--nb-rollbacks", help="Number of rollbacks to apply"),
+    migration_id: str | None = Option(None, "-m", "--migration-id", help="Migration id to rollback to"),
 ):
     from .migration import migrate_down, NoSetupTableError
 
     try:
-        await migrate_down(conn, folder=sql_dir, nb_migrations=nb_rollbacks)
+        await migrate_down(conn, folder=sql_dir, migration_id=migration_id, nb_migrations=nb_rollbacks)
     except NoSetupTableError as e:
         logs.critical(e, exc_info=False)
 
@@ -141,3 +143,39 @@ def verify_files(
         raise CommandError("Files are not correctly ordered")
     else:
         CONSOLE.print("[green]Files are correctly ordered[/green]")
+
+
+@migration.command(cmd="reorder-files", help="Reorder the files")
+def reorder_files(
+    migrations_dir: Path = MigrationDir,
+    output_dir: Path | None = Option(
+        None, "--output-dir", "-o", help="Output directory", raise_path_does_not_exist=False
+    ),
+    last_migration_ids: list[str] = Option(None, "--ids", "-l", help="Last migration ids (in descending order)"),
+):
+    from .reorder import reorder_files
+    from .utils import verify_migration_files
+
+    folder = migrations_dir
+    # Creating the output dir
+    if output_dir is not None:
+        if output_dir.exists():
+            shutil.rmtree(output_dir)
+        shutil.copytree(migrations_dir, output_dir)
+        folder = output_dir
+
+    reorder_files(folder, last_migration_ids=last_migration_ids or [])
+    try:
+        verify_migration_files(folder)
+    except ValueError as e:
+        raise CommandError(str(e))
+
+
+@migration.command(cmd="verify-migrations", help="Verify that the migrations are applied correctly")
+async def verify_migrations(
+    pg_conn: Connection = Derived(get_pg),
+    migrations_dir: Path = MigrationDir,
+):
+    from .migration import verify_migrations
+
+    await verify_migrations(pg_conn, migrations_dir)

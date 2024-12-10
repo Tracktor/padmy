@@ -2,7 +2,7 @@ import logging
 
 import pytest
 
-from .conftest import STATIC_DIR, PG_SAMPLE_DATABASE, PG_DATABASE
+from .conftest import STATIC_DIR, PG_SAMPLE_DATABASE, PG_DATABASE, PG_PASSWORD
 
 
 @pytest.fixture(autouse=True)
@@ -16,7 +16,7 @@ def restore_log_lvl():
 def test_run_anonymize():
     from run import cli
 
-    cli.run_with_args("anonymize", "--db", "test", "-f", str(STATIC_DIR / "config.yml"))
+    cli.run_with_args("anonymize", "--db", "test", "-f", str(STATIC_DIR / "config.yml"), "-p", PG_PASSWORD)
 
 
 @pytest.fixture()
