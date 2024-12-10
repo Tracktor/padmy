@@ -11,9 +11,9 @@ from typing import Callable, Iterator
 import asyncpg
 from asyncpg import Connection
 from asyncpg.exceptions import UndefinedTableError
-
 from tracktolib.pg import insert_one
 from tracktolib.utils import get_chunks
+
 from padmy.logs import logs
 from padmy.utils import exec_file, pg_dump, exec_psql_file
 from .utils import get_files, iter_migration_files, MigrationFile
@@ -365,11 +365,7 @@ async def migrate_down(
     return True
 
 
-async def verify_migrations(conn: asyncpg.Connection, folder: Path, *, chunk_size: int = 500):
-    """
-    Verify that all migrations inside "folder" have been applied to the database.
-    If not, tries to apply them
-    """
+async def get_missing_migrations(conn: asyncpg.Connection, folder: Path, *, chunk_size: int = 500):
     files = get_files(folder, up_only=True)
     not_applied_files = []
     for chunk in get_chunks(files, size=chunk_size, as_list=True):
@@ -384,6 +380,15 @@ async def verify_migrations(conn: asyncpg.Connection, folder: Path, *, chunk_siz
             if _file.file_id not in file_ids_db:
                 not_applied_files.append(_file)
 
+    return not_applied_files
+
+
+async def verify_migrations(conn: asyncpg.Connection, folder: Path, *, chunk_size: int = 500):
+    """
+    Verify that all migrations inside "folder" have been applied to the database.
+    If not, tries to apply them
+    """
+    not_applied_files = await get_missing_migrations(conn, folder=folder, chunk_size=chunk_size)
     if not not_applied_files:
         logs.info("All migrations have been applied")
         return
