@@ -389,7 +389,4 @@ async def verify_migrations(conn: asyncpg.Connection, folder: Path, *, chunk_siz
         return
     logs.info(f"Found {len(not_applied_files)} missing files")
     for _file in not_applied_files:
-        try:
-            await apply_migration(conn, _file, metadata={"missing": True})
-        except Exception:
-            break
+        await apply_migration(conn, _file, metadata={"missing": True})

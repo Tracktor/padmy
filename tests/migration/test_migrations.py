@@ -1,17 +1,18 @@
+import datetime as dt
 import logging
 import re
 from contextlib import nullcontext
 from typing import Literal
-import datetime as dt
+from unittest.mock import Mock
+
 import psycopg
 import pytest
+from tracktolib.pg_sync import fetch_all, insert_one, insert_many
 
-from unittest.mock import Mock
+from padmy.migration.utils import parse_filename
 from .conftest import VALID_MIGRATIONS_DIR, INVALID_MIGRATIONS_DIR, INVALID_MIGRATIONS_DIR_MULTIPLE
 from ..conftest import PG_DATABASE
-from tracktolib.pg_sync import fetch_all, insert_one, insert_many
 from ..utils import check_table_exists, check_column_exists
-from padmy.migration.utils import parse_filename
 
 TEST_EMAIL = "foo@baz.baz"
 
@@ -117,7 +118,7 @@ def test_migrate_verify_valid(monkeypatch, engine, tmp_path, only_last):
         ),
     ],
 )
-def test_migrate_verify(monkeypatch, engine, tmp_path, only_last, migration_dir, error_msg):
+def test_migrate_verify(engine, tmp_path, only_last, migration_dir, error_msg):
     from padmy.migration import migrate_verify
     from padmy.migration.migration import MigrationError
 
@@ -147,7 +148,7 @@ SETUP_ERROR_MSG = re.escape(
 
 @pytest.mark.parametrize("migration_type", ["up", "down"])
 @pytest.mark.usefixtures("clean_migration")
-def test_migrate_no_setup(engine, monkeypatch, aengine, loop, migration_type):
+def test_migrate_no_setup(engine, aengine, loop, migration_type):
     from padmy.migration.migration import migrate_up, NoSetupTableError, migrate_down
 
     fn = migrate_up if migration_type == "up" else migrate_down
@@ -171,7 +172,6 @@ def _insert_migrations(
         raise ValueError(f"Invalid number of migrations {nb_migrations} > {nb_max_migrations}")
 
     _now = dt.datetime.now() + dt.timedelta(seconds=offset_seconds)
-    print("Now:", _now)
     _data = [
         {
             "file_name": _files[i].name,
@@ -317,7 +317,7 @@ def test_migration_files(engine, aengine, loop, migration_type, setup_fn, params
 
 
 @pytest.mark.usefixtures("clean_migration", "setup_test_schema")
-def test_migrate_up_down(engine, monkeypatch, caplog, aengine, loop):
+def test_migrate_up_down(engine, caplog, aengine, loop):
     def _get_migrations():
         return fetch_all(engine, "SELECT * FROM public.migration order by applied_at desc")
 
@@ -400,6 +400,75 @@ def test_migrate_up_down(engine, monkeypatch, caplog, aengine, loop):
     assert check_column_exists(engine, "general", "test", "baz")
     data = fetch_all(engine, "SELECT * FROM public.migration ORDER BY applied_at DESC")
     assert len(data) == 6
+
+
+class TestVerifyMigrations:
+    @pytest.fixture(autouse=True)
+    def setup_tables(self, setup):
+        pass
+
+    _no_data = pytest.param({"before": [], "after": []}, None, None, id="no data")
+    _missing_migrations_in_db = pytest.param(
+        {
+            "before": [],
+            "after": [
+                {"migration_type": "up", "file_name": "1-00000000-up.sql", "meta": {"missing": True}},
+                {"migration_type": "up", "file_name": "2-00000001-up.sql", "meta": {"missing": True}},
+            ],
+        },
+        VALID_MIGRATIONS_DIR,
+        None,
+        id="missing migrations in db",
+    )
+
+    _missing_intermediate_migration = pytest.param(
+        {
+            "before": [
+                {"migration_type": "up", "file_name": "2-00000001-up.sql", "meta": None},
+            ],
+            "after": [
+                {"migration_type": "up", "file_name": "2-00000001-up.sql", "meta": None},
+                {"migration_type": "up", "file_name": "1-00000000-up.sql", "meta": {"missing": True}},
+            ],
+        },
+        VALID_MIGRATIONS_DIR,
+        lambda engine: (
+            insert_one(
+                engine,
+                "migration",
+                {
+                    "id": 0,
+                    "migration_type": "up",
+                    "file_name": "2-00000001-up.sql",
+                    "file_id": "00000001",
+                    "file_ts": dt.datetime(1970, 1, 1, 0, 0, 1),
+                },
+            ),
+            engine.commit(),
+        ),
+        id="missing intermediate migration in db",
+    )
+
+    @pytest.mark.usefixtures("setup_test_schema")
+    @pytest.mark.parametrize(
+        "expected, migrations_folder, setup_fn",
+        [_no_data, _missing_migrations_in_db, _missing_intermediate_migration],
+    )
+    def test_verify_migrations(self, aengine, loop, engine, migrations_folder, expected, tmp_path, setup_fn):
+        from padmy.migration import verify_migrations
+
+        if setup_fn is not None:
+            setup_fn(engine)
+
+        def _get_migrations():
+            return fetch_all(engine, "SELECT migration_type, file_name, meta from migration order by applied_at")
+
+        before_migrations = _get_migrations()
+        # assert before_migrations
+        assert before_migrations == expected["before"]
+        loop.run_until_complete(verify_migrations(aengine, folder=migrations_folder or tmp_path))
+        after_migrations = _get_migrations()
+        assert after_migrations == expected["after"]
 
 
 class TestMigrationFiles:
