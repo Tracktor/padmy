@@ -1,5 +1,4 @@
 import time
-import uuid
 from pathlib import Path
 
 from rich.markup import escape
@@ -7,6 +6,7 @@ from rich.prompt import Prompt
 
 from padmy.env import CONSOLE
 from padmy.logs import logs
+from .migration import MigrationFile
 from .config import MigrationConfig
 from .utils import get_files, iter_migration_files, Header
 
@@ -34,7 +34,7 @@ def create_new_migration(folder: Path, version: str | None = None) -> tuple[Path
     """
     folder.mkdir(exist_ok=True, parents=True)
 
-    _base_name = f"{int(time.time())}-{str(uuid.uuid4())[:8]}"
+    _base_name = MigrationFile.generate_base_name(ts=int(time.time()))
     CONSOLE.print(f"\nCreating new migration file ([green]{escape(_base_name)}[/green]):\n")
 
     last_migration = _get_last_migration_name(folder)

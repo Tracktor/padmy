@@ -299,6 +299,9 @@ async def get_rollback_files(
     nb_migrations: int = -1,
     migration_id: str | None = None,
 ) -> list[MigrationFile]:
+    if migration_id is not None and nb_migrations >= 0:
+        raise ValueError('Specify either "nb_migrations" or "migration_id"')
+
     applied_migrations = await get_applied_migrations(conn)
     applied_migration_ids = {item["file_id"] for item in applied_migrations if not item["has_applied_rollback"]}
     rollback_to_apply = [

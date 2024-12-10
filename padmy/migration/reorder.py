@@ -3,6 +3,8 @@ import datetime as dt
 from .utils import get_files, utc_now, iter_migration_files
 from padmy.logs import logs
 
+__all__ = ("reorder_files",)
+
 
 def reorder_files(folder: Path, last_migration_ids: list[str]):
     """
@@ -24,6 +26,9 @@ def reorder_files(folder: Path, last_migration_ids: list[str]):
             0001_file2.sql
             0003_file4.sql
     """
+    if not last_migration_ids:
+        return
+
     to_reorder_files = []
     last_commit_files = []
     _migration_ids = set(last_migration_ids)

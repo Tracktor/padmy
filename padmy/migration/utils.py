@@ -1,5 +1,6 @@
 import datetime as dt
 import sys
+import uuid
 
 if sys.version_info >= (3, 12):
     UTC = dt.UTC
@@ -15,7 +16,6 @@ from padmy.logs import logs
 
 from padmy.utils import exec_cmd
 
-
 __all__ = (
     "Header",
     "MigrationFile",
@@ -23,6 +23,7 @@ __all__ = (
     "iter_migration_files",
     "verify_migration_files",
     "get_git_email",
+    "utc_now",
 )
 
 
@@ -74,18 +75,48 @@ class MigrationFile:
     path: Path
     header: Header | None = None
 
+    @property
+    def name(self):
+        return f"{int(self.ts.timestamp())}-{self.file_id}-{self.file_type}.sql"
+
     def replace_ts(self, ts: dt.datetime):
         self.ts = ts
-        new_path = self.path.with_name(f"{int(self.ts.timestamp())}-{self.file_id}-{self.file_type}.sql")
+        new_path = self.path.with_name(self.name)
         self.path = self.path.rename(new_path)
 
     def write_header(self):
         if not self.header:
             return
         # Remove the first lines starting with --
-        lines = [_line for _line in self.path.read_text().split("\n") if not _line.startswith("-- ")]
-        new_text = self.header.as_text() + "\n" + "\n".join(lines)
+        if self.path.exists():
+            lines = [_line for _line in self.path.read_text().split("\n") if not _line.startswith("-- ")]
+            _lines = "\n" + "\n".join(lines)
+        else:
+            _lines = "\n"
+        new_text = self.header.as_text() + _lines
         self.path.write_text(new_text)
+
+    @staticmethod
+    def generate_base_name(ts: int | None = None, file_id: str | None = None) -> str:
+        """
+        Get a base name based on the timestamp and file_id
+        to be used to generated file name later ({base_name}-{file_type}.sql)
+        """
+        _file_id = str(uuid.uuid4())[:8] if file_id is None else file_id
+        _ts = ts if ts is not None else int(utc_now().timestamp())
+        return f"{_ts}-{_file_id}"
+
+    @classmethod
+    def from_file(cls, path: Path):
+        filename_infos = parse_filename(path.name)
+        header = Header.from_text(path.read_text())
+        return cls(
+            ts=filename_infos["file_ts"],
+            file_id=filename_infos["file_id"],
+            file_type=filename_infos["migration_type"],
+            path=path,
+            header=header if not header.is_empty else None,
+        )
 
 
 def parse_filename(filename: str) -> dict:
@@ -103,17 +134,8 @@ def get_files(folder: Path, reverse: bool = False, up_only: bool = False) -> lis
     files = []
     pattern = "*.sql" if not up_only else "*-up.sql"
     for file in folder.glob(pattern):
-        filename_infos = parse_filename(file.name)
-        header = Header.from_text(file.read_text())
-        files.append(
-            MigrationFile(
-                ts=filename_infos["file_ts"],
-                file_id=filename_infos["file_id"],
-                file_type=filename_infos["migration_type"],
-                path=file,
-                header=header if not header.is_empty else None,
-            )
-        )
+        files.append(MigrationFile.from_file(file))
+
     return sorted(files, key=attrgetter("ts", "file_id"), reverse=reverse)
 
 
@@ -186,4 +208,4 @@ def verify_migration_files(migration_dir: Path, *, raise_error: bool = True):
 
 
 def utc_now():
-    return dt.datetime.now(dt.UTC).replace(tzinfo=None)
+    return dt.datetime.now(UTC).replace(tzinfo=None)
