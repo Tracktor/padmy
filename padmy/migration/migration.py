@@ -386,7 +386,9 @@ async def get_missing_migrations(conn: asyncpg.Connection, folder: Path, *, chun
     return not_applied_files
 
 
-async def verify_migrations(conn: asyncpg.Connection, folder: Path, *, chunk_size: int = 500):
+async def verify_migrations(
+    conn: asyncpg.Connection, folder: Path, *, chunk_size: int = 500, metadata: dict | None = None
+):
     """
     Verify that all migrations inside "folder" have been applied to the database.
     If not, tries to apply them
@@ -396,5 +398,6 @@ async def verify_migrations(conn: asyncpg.Connection, folder: Path, *, chunk_siz
         logs.info("All migrations have been applied")
         return
     logs.info(f"Found {len(not_applied_files)} missing files")
+    _meta = metadata or {"missing": True}
     for _file in not_applied_files:
-        await apply_migration(conn, _file, metadata={"missing": True})
+        await apply_migration(conn, _file, metadata=_meta)
