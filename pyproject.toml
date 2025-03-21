@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "padmy"
-version = "0.17.0"
+version = "0.18.0"
 description = ""
 authors = ["andarius <julien.brayere@tracktor.fr>"]
 
@@ -58,7 +58,7 @@ padmy = 'run:run'
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.17.0"
+version = "0.18.0"
 tag_format = "$version"
 version_files = [
     "pyproject.toml:version"
