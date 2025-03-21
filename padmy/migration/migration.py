@@ -118,6 +118,7 @@ def migrate_verify(
     *,
     only_last: bool = False,
     compare_files_fn: CompareFilesFn = compare_files,
+    skip_down_restore: bool = False,
 ):
     """
     Verifies that the up/down migration is correct
@@ -155,14 +156,15 @@ def migrate_verify(
         logs.error(e.diff)
         raise e
 
-    # Restoring to initial state
-    logs.info("Restoring to initial state")
-    for i, _down_file in enumerate(reversed(_down_files)):
-        logs.info(f"Applying {_down_file.path.name} ({len(_down_files) - i}/{len(_down_files)})")
-        exec_psql_file(database, str(_down_file.path))
-    # else:
-    #     if last_down_file:
-    #         exec_psql_file(database, str(last_down_file.path))
+    if not skip_down_restore:
+        # Restoring to initial state
+        logs.info("Restoring to initial state")
+        for i, _down_file in enumerate(reversed(_down_files)):
+            logs.info(f"Applying {_down_file.path.name} ({len(_down_files) - i}/{len(_down_files)})")
+            exec_psql_file(database, str(_down_file.path))
+        # else:
+        #     if last_down_file:
+        #         exec_psql_file(database, str(last_down_file.path))
 
     logs.info("Everything ok!")
 
