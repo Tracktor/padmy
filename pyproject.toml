@@ -52,6 +52,8 @@ useLibraryCodeForTypes = true
 
 [tool.poetry.scripts]
 cli = 'run:run'
+padmy = 'run:run'
+
 
 
 [tool.commitizen]
