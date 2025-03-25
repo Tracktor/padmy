@@ -1,7 +1,7 @@
 import datetime as dt
 import sys
 import uuid
-from typing import Literal
+from typing import Literal, get_args, TypeGuard
 
 if sys.version_info >= (3, 12):
     UTC = dt.UTC
@@ -174,11 +174,21 @@ def iter_migration_files(files: list[MigrationFile]):
 MigrationErrorType = Literal["order", "header", "duplicate"]
 
 
+def is_migration_error_type(value: str) -> TypeGuard[MigrationErrorType]:
+    return value in get_args(MigrationErrorType)
+
+
 class MigrationFileError(Exception):
     def __init__(self, error_type: MigrationErrorType, message: str, file_id: str):
-        self.error_type = error_type
+        self._error_type = error_type
         self.message = message
         self.file_id = file_id
+
+    @property
+    def error_type(self) -> MigrationErrorType:
+        if is_migration_error_type(self._error_type):
+            return self._error_type
+        raise ValueError(f"Invalid error type {self._error_type!r}")
 
 
 def verify_migration_files(
