@@ -1,11 +1,13 @@
-from pathlib import Path
 import datetime as dt
-from .utils import get_files, utc_now, iter_migration_files, MigrationFile
+from pathlib import Path
 
-__all__ = ("reorder_files", "rename_files")
+from padmy.logs import logs
+from .utils import get_files, utc_now, iter_migration_files, MigrationFile, verify_migration_files, MigrationErrorType
+
+__all__ = ("reorder_files", "reorder_files_by_migrations", "rename_files")
 
 
-def reorder_files(folder: Path, last_migration_ids: list[str]):
+def reorder_files_by_migrations(folder: Path, last_migration_ids: list[str]):
     """
     Reorder the migration files given the last N commits (in descending order).
     For instance, let's say we have the following migration files:
@@ -63,6 +65,48 @@ def reorder_files(folder: Path, last_migration_ids: list[str]):
     rename_files(utc_now(), last_migrations=(last_up_file, last_down_file), migration_files=new_order_files)
 
 
+def _fix_file(
+    files: tuple[MigrationFile, MigrationFile],
+    prev_files: tuple[MigrationFile, MigrationFile],
+    error_type: MigrationErrorType,
+):
+    up_file, down_file = files
+    prev_up_file, prev_down_file = prev_files
+
+    match error_type:
+        case "header":
+            if up_file.header is None or down_file.header is None:
+                raise ValueError("Header is missing")
+            up_file.header.prev_file, down_file.header.prev_file = prev_up_file.path.name, prev_down_file.path.name
+            up_file.write_header()
+            down_file.write_header()
+        case _:
+            raise NotImplementedError(f"Reorder error type {error_type} is not implemented")
+
+
+def reorder_files(folder: Path):
+    invalid_files = verify_migration_files(folder, raise_error=False)
+    if not invalid_files:
+        logs.info("All files are correctly ordered")
+        return
+    logs.info(f"Found {len(invalid_files)} files to reorder")
+
+    file_errors = {error.file_id: error for _, _, error in invalid_files}
+
+    prev_up_file, prev_down_file = None, None
+    for up_file, down_file in iter_migration_files(get_files(folder)):
+        # Skipping the first iteration
+        if prev_up_file is None or prev_down_file is None:
+            prev_up_file, prev_down_file = (up_file, down_file)
+            continue
+
+        _error = file_errors.get(up_file.file_id)
+        if _error is not None:
+            _fix_file((up_file, down_file), (prev_up_file, prev_down_file), _error.error_type)
+
+        prev_up_file, prev_down_file = up_file, down_file
+
+
 def rename_files(
     last_ts: dt.datetime,
     last_migrations: tuple[MigrationFile | None, MigrationFile | None],
@@ -78,9 +122,5 @@ def rename_files(
         _down_file.replace_ts(last_ts + dt.timedelta(seconds=i))
         # Rewrite headers
         if _prev_down_file is not None and _prev_up_file is not None:
-            if _up_file.header is None or _down_file.header is None:
-                raise ValueError("Header is missing")
-            _up_file.header.prev_file, _down_file.header.prev_file = _prev_up_file.path.name, _prev_down_file.path.name
-            _up_file.write_header()
-            _down_file.write_header()
+            _fix_file((_up_file, _down_file), (_prev_up_file, _prev_down_file), "header")
         _prev_up_file, _prev_down_file = _up_file, _down_file

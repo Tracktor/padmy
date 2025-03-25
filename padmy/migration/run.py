@@ -151,10 +151,10 @@ def reorder_files(
     output_dir: Path | None = Option(
         None, "--output-dir", "-o", help="Output directory", raise_path_does_not_exist=False
     ),
-    last_migration_ids: list[str] = Option(None, "--ids", "-l", help="Last migration ids (in descending order)"),
+    last_migration_ids: list[str] | None = Option(None, "--ids", "-l", help="Last migration ids (in descending order)"),
 ):
-    from .reorder import reorder_files
-    from .utils import verify_migration_files
+    from .reorder import reorder_files, reorder_files_by_migrations
+    from .utils import verify_migration_files, MigrationFileError
 
     folder = migrations_dir
     # Creating the output dir
@@ -164,11 +164,14 @@ def reorder_files(
         shutil.copytree(migrations_dir, output_dir)
         folder = output_dir
 
-    reorder_files(folder, last_migration_ids=last_migration_ids or [])
+    if last_migration_ids:
+        reorder_files_by_migrations(folder, last_migration_ids=last_migration_ids)
+    else:
+        reorder_files(folder)
     try:
         verify_migration_files(folder)
-    except ValueError as e:
-        raise CommandError(str(e))
+    except MigrationFileError as e:
+        raise CommandError(e.message)
 
 
 @migration.command(cmd="verify-migrations", help="Verify that the migrations are applied correctly")
