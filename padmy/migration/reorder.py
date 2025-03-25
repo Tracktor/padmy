@@ -103,8 +103,9 @@ def reorder_files(folder: Path):
         _error = file_errors.get(up_file.file_id)
         if _error is not None:
             _fix_file((up_file, down_file), (prev_up_file, prev_down_file), _error.error_type)
-
         prev_up_file, prev_down_file = up_file, down_file
+
+    logs.info("Done")
 
 
 def rename_files(
