@@ -1,6 +1,7 @@
 import datetime as dt
 import sys
 import uuid
+from typing import Literal
 
 if sys.version_info >= (3, 12):
     UTC = dt.UTC
@@ -24,7 +25,12 @@ __all__ = (
     "verify_migration_files",
     "get_git_email",
     "utc_now",
+    "MigrationFileError",
+    "MigrationErrorType",
 )
+
+
+PREFIXES = {"author": "-- Author:", "prev-file": "-- Prev-file:", "version": "-- Version:"}
 
 
 def get_git_email():
@@ -47,21 +53,21 @@ class Header:
         author = None
         version = None
         for line in text.split("\n"):
-            if line.startswith("-- Prev-file:"):
+            if line.startswith(PREFIXES["prev-file"]):
                 prev_file = line.split(":")[1].strip()
-            elif line.startswith("-- Author:"):
+            elif line.startswith(PREFIXES["author"]):
                 author = line.split(":")[1].strip()
-            elif line.startswith("-- Version:"):
+            elif line.startswith(PREFIXES["version"]):
                 version = line.split(":")[1].strip()
         return cls(prev_file, author, version)
 
     def as_text(self):
         _header = [
-            f"-- Prev-file: {self.prev_file or ''}",
-            f"-- Author: {self.author or ''}",
+            f"{PREFIXES['prev-file']} {self.prev_file or ''}",
+            f"{PREFIXES['author']} {self.author or ''}",
         ]
         if self.version is not None:
-            _header.append(f"-- Version: {self.version}")
+            _header.append(f"{PREFIXES['version']} {self.version}")
 
         file_header = textwrap.dedent("\n".join(_header)).strip()
         return file_header
@@ -89,7 +95,9 @@ class MigrationFile:
             return
         # Remove the first lines starting with --
         if self.path.exists():
-            lines = [_line for _line in self.path.read_text().split("\n") if not _line.startswith("-- ")]
+            lines = [
+                _line for _line in self.path.read_text().split("\n") if not _line.startswith(tuple(PREFIXES.values()))
+            ]
             _lines = "\n" + "\n".join(lines)
         else:
             _lines = "\n"
@@ -162,12 +170,26 @@ def iter_migration_files(files: list[MigrationFile]):
         yield _up_files[0], _down_files[0]
 
 
-def verify_migration_files(migration_dir: Path, *, raise_error: bool = True):
+MigrationErrorType = Literal["order", "header", "duplicate"]
+
+
+class MigrationFileError(Exception):
+    def __init__(self, error_type: MigrationErrorType, message: str, file_id: str):
+        self.error_type = error_type
+        self.message = message
+        self.file_id = file_id
+
+
+def verify_migration_files(
+    migration_dir: Path, *, raise_error: bool = True
+) -> list[tuple[MigrationFile, MigrationFile, MigrationFileError]]:
     """
     Verifies that the migration files are in order.
+    If raise_error is set to False, it will return weather or not the files are in order
+    and a list of files that are not correct (with the associated error message)
     """
     prev_files = None
-    has_errors = False
+    error_files = []
     _ids = set()
     for _file in iter_migration_files(get_files(migration_dir)):
         if prev_files is None:
@@ -177,36 +199,44 @@ def verify_migration_files(migration_dir: Path, *, raise_error: bool = True):
         up, down = _file
 
         if up.file_id in _ids:
-            raise ValueError(f"Duplicate file id {up.file_id}")
+            raise MigrationFileError("duplicate", f"Duplicate file_id: {up.file_id}", file_id=up.file_id)
         _ids.add(up.file_id)
 
         try:
             if prev_up.ts > up.ts:
-                raise ValueError(f"Files are not in order: {prev_up.path.name} > {up.path.name}")
+                raise MigrationFileError(
+                    "order", f"Files are not in order: {prev_up.path.name} > {up.path.name}", file_id=up.file_id
+                )
             if prev_down.ts > down.ts:
-                raise ValueError(f"Files are not in order: {prev_down.path.name} > {down.path.name}")
+                raise MigrationFileError(
+                    "order", f"Files are not in order: {prev_down.path.name} > {down.path.name}", file_id=down.file_id
+                )
 
             if up.header is not None and up.header.prev_file != prev_up.path.name:
-                raise ValueError(
+                raise MigrationFileError(
+                    "header",
                     f"Invalid header for up file {up.path.name} : "
-                    f"(expected {prev_up.path.name!r} got {up.header.prev_file!r})"
+                    f"(expected {prev_up.path.name!r} got {up.header.prev_file!r})",
+                    file_id=up.file_id,
                 )
             if down.header is not None and down.header.prev_file != prev_down.path.name:
-                raise ValueError(
+                raise MigrationFileError(
+                    "header",
                     f"Invalid header for down file {down.path.name} : "
-                    f"(expected {prev_down.path.name!r} got {down.header.prev_file!r})"
+                    f"(expected {prev_down.path.name!r} got {down.header.prev_file!r})",
+                    file_id=down.file_id,
                 )
-        except ValueError as e:
+        except MigrationFileError as e:
             if raise_error:
                 raise e
-            logs.warning(e.args[0])
-            has_errors = True
+            logs.warning(e.message)
+            error_files.append((up, down, e))
         else:
-            logs.info(f"Valid header for file {up.path.name}")
+            logs.debug(f"Valid header for file {up.path.name}")
 
         prev_files = _file
 
-    return has_errors
+    return error_files
 
 
 def utc_now():
