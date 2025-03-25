@@ -9,7 +9,7 @@ import psycopg
 import pytest
 from tracktolib.pg_sync import fetch_all, insert_one, insert_many
 
-from padmy.migration.utils import parse_filename
+from padmy.migration.utils import parse_filename, MigrationFileError
 from .conftest import VALID_MIGRATIONS_DIR, INVALID_MIGRATIONS_DIR, INVALID_MIGRATIONS_DIR_MULTIPLE
 from ..conftest import PG_DATABASE
 from ..utils import check_table_exists, check_column_exists
@@ -514,11 +514,11 @@ class TestMigrationFiles:
     @pytest.mark.parametrize(
         "setup, expected",
         [
-            pytest.param("setup_valid_migration_files", nullcontext(False), id="valid"),
+            pytest.param("setup_valid_migration_files", nullcontext([]), id="valid"),
             pytest.param(
                 "setup_invalid_up_migration_files",
                 pytest.raises(
-                    ValueError,
+                    MigrationFileError,
                     match=re.escape(
                         "Invalid header for up file 2-20000000-up.sql : (expected '1-10000000-up.sql' got '0-10000000')"
                     ),

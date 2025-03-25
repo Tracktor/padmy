@@ -27,6 +27,7 @@ __all__ = (
     "utc_now",
     "MigrationFileError",
     "MigrationErrorType",
+    "parse_filename",
 )
 
 
