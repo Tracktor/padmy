@@ -205,7 +205,7 @@ async def _get_latest_migration(conn: Connection):
     except UndefinedTableError as e:
         if 'relation "public.migration" does not exist' in str(e):
             raise NoSetupTableError(
-                'Could not find table table "public.migration", did you forget to setup the table'
+                'Could not find table "public.migration", did you forget to setup the table'
                 ' by running "migration setup" ?'
             )
         else:
@@ -299,7 +299,7 @@ async def get_applied_migrations(conn: asyncpg.Connection) -> list[AppliedMigrat
     except UndefinedTableError as e:
         if 'relation "public.migration" does not exist' in str(e):
             raise NoSetupTableError(
-                'Could not find table table "public.migration", did you forget to setup the table'
+                'Could not find table "public.migration", did you forget to setup the table'
                 ' by running "migration setup" ?'
             )
         else:
