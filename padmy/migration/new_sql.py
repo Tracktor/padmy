@@ -1,8 +1,7 @@
-import os
 from pathlib import Path
 
 
-def create_sql_file(sql_dir: Path, position: int):
+def create_sql_file(sql_dir: Path, position: int) -> Path:
     """
     Utility to insert a new sql file between other sql files.
     For instance, let's say we have:
@@ -33,4 +32,6 @@ def create_sql_file(sql_dir: Path, position: int):
         if not is_before:
             _file.rename(f"{sql_dir}/{_curr_pos + 1:04}_{_file_name}")
 
-    os.close(os.open(f"{sql_dir}/{position:04}_new_file.sql", os.O_CREAT))
+    _new_file = sql_dir / f"{position:04}_new_file.sql"
+    _new_file.touch()
+    return _new_file

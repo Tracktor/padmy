@@ -1,4 +1,3 @@
 -- Prev-file: 1-00000000-down.sql
 -- Author: foo@bar.baz
-
-ALTER TABLE general.test DROP COLUMN baz;
+-- Skip-verify: Cannot be rolled back

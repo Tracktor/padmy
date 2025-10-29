@@ -10,7 +10,12 @@ import pytest
 from tracktolib.pg_sync import fetch_all, insert_one, insert_many
 
 from padmy.migration.utils import parse_filename, MigrationFileError
-from .conftest import VALID_MIGRATIONS_DIR, INVALID_MIGRATIONS_DIR, INVALID_MIGRATIONS_DIR_MULTIPLE
+from .conftest import (
+    VALID_MIGRATIONS_DIR,
+    INVALID_MIGRATIONS_DIR,
+    INVALID_MIGRATIONS_DIR_MULTIPLE,
+    VALID_MIGRATIONS_SKIP_DIR,
+)
 from ..conftest import PG_DATABASE
 from ..utils import check_table_exists, check_column_exists
 
@@ -59,16 +64,21 @@ def test_create_new_migration(monkeypatch, migration_dir, capsys, version):
     down_content = [x.rstrip() for x in down_file.open().readlines() if x.strip()]
     assert down_content == ["-- Prev-file:", f"-- Author: {TEST_EMAIL}"] + _optional_args
 
-    # Creating second migration
+    # Creating second migration with skip verify
 
-    create_new_migration(folder=migration_dir, version=version)
+    create_new_migration(folder=migration_dir, version=version, skip_verify=True)
     new_files = list(migration_dir.glob("*.sql"))
     assert capsys.readouterr().out.strip().startswith("Creating new migration file")
     up_file2, down_file2 = sorted(new_files, key=lambda x: x.name, reverse=True)[:2]
     up_content = [x.rstrip() for x in up_file2.open().readlines() if x.strip()]
     assert up_content == [f"-- Prev-file: {up_file.name}", f"-- Author: {TEST_EMAIL}"] + _optional_args
     down_content = [x.rstrip() for x in down_file2.open().readlines() if x.strip()]
-    assert down_content == [f"-- Prev-file: {down_file.name}", f"-- Author: {TEST_EMAIL}"] + _optional_args
+    assert down_content == [
+        f"-- Prev-file: {down_file.name}",
+        f"-- Author: {TEST_EMAIL}",
+        *_optional_args,
+        "-- Skip-verify: no reason provided",
+    ]
 
 
 @pytest.mark.usefixtures("clean_migration")
@@ -81,7 +91,7 @@ def test_migrate_setup(engine, loop, aengine):
 
 @pytest.mark.usefixtures("setup_test_schema")
 @pytest.mark.parametrize("only_last", [True, False])
-def test_migrate_verify_valid(monkeypatch, engine, tmp_path, only_last):
+def test_migrate_verify_valid(tmp_path, only_last):
     from padmy.migration import migrate_verify
     from padmy.migration.migration import MigrationError
 
@@ -105,6 +115,31 @@ def test_migrate_verify_valid(monkeypatch, engine, tmp_path, only_last):
     except MigrationError as e:
         print(e.diff)
         raise e
+
+
+@pytest.mark.usefixtures("setup_test_schema")
+def test_migrate_verify_valid_skip(tmp_path):
+    from padmy.migration import migrate_verify
+    from padmy.utils import PGError
+
+    migrate_verify(
+        database=PG_DATABASE,
+        schemas=["general"],
+        dump_dir=tmp_path,
+        migration_folder=VALID_MIGRATIONS_SKIP_DIR,
+        only_last=True,
+        skip_down_restore=True,
+    )
+    # Should raise an error since the down file is not skipped
+    with pytest.raises(PGError, match=r'ERROR:  column "baz" of relation "test" already exists'):
+        migrate_verify(
+            database=PG_DATABASE,
+            schemas=["general"],
+            dump_dir=tmp_path,
+            migration_folder=VALID_MIGRATIONS_SKIP_DIR,
+            only_last=True,
+            skip_down_restore=True,
+        )
 
 
 @pytest.mark.usefixtures("setup_test_schema")
@@ -142,7 +177,7 @@ def test_migrate_verify(engine, tmp_path, only_last, migration_dir, error_msg):
 
 
 SETUP_ERROR_MSG = re.escape(
-    'Could not find table table "public.migration", ' 'did you forget to setup the table by running "migration setup" ?'
+    'Could not find table "public.migration", did you forget to setup the table by running "migration setup" ?'
 )
 
 

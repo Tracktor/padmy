@@ -25,7 +25,7 @@ def get_update_query(table: str, pks: list[str], fields: list[str], field_types:
       {_set_fields}
     from (values
       ({_values})
-    ) as u2({', '.join(_table_keys)})
+    ) as u2({", ".join(_table_keys)})
     where {_where}
     """
     return query

@@ -3,6 +3,7 @@ import datetime as dt
 import difflib
 import filecmp
 import functools
+import textwrap
 import typing
 from contextlib import nullcontext
 from pathlib import Path
@@ -15,18 +16,20 @@ from tracktolib.pg import insert_one
 from tracktolib.utils import get_chunks
 
 from padmy.logs import logs
-from padmy.utils import exec_file, pg_dump, exec_psql_file
+from padmy.utils import exec_file, pg_dump, exec_psql_file, remove_restrict_clauses
 from .utils import get_files, iter_migration_files, MigrationFile
 
-_GET_LATEST_MIGRATION_QUERY = """
+_GET_LATEST_MIGRATION_QUERY = textwrap.dedent(
+    """
 SELECT _m.file_ts, _m.file_name, _m.file_id
 FROM public.migration _m
-         left join public.migration _r on _r.migration_type = 'down' and _r.file_id = _m.file_id
+       left join public.migration _r
+                 on _r.migration_type = 'down' and _r.file_id = _m.file_id
 where _m.migration_type = 'up'
-  and _r.file_id is null
-order by _m.applied_at desc, file_ts desc
-limit 1
+and _r.file_id is null
+order by _m.applied_at desc, file_ts desc limit 1
 """
+)
 
 # PG_GLOBAL_DUMP_DIR = GLOBAL_TMP / 'matching-pg-backup' / 'dump'
 SETUP_FILE = Path(__file__).parent / "db.sql"
@@ -47,10 +50,15 @@ async def migrate_setup(conn: Connection):
 CompareFilesFn = Callable[[Path, Path], Iterator[str] | None]
 
 
-def compare_files(file1: Path, file2: Path) -> Iterator[str] | None:
+def compare_files(file1: Path, file2: Path, ignore_restrict: bool = True) -> Iterator[str] | None:
     """
-    Compares 2 files. If they are the same, returns None, otherwise returns the diff
+    Compares 2 files. If they are the same, returns None, otherwise returns the diff.
+    If ignore_restrict is True, ignores \restrict clauses in the
+    diff ([PostgreSQL 17.6+](https://www.postgresql.org/docs/17/release-17-6.html#RELEASE-17-6-CHANGES) feature).
     """
+    if ignore_restrict:
+        remove_restrict_clauses(file1)
+        remove_restrict_clauses(file2)
     _no_diff = filecmp.cmp(file1, file2)
     if _no_diff:
         return None
@@ -63,6 +71,9 @@ def compare_files(file1: Path, file2: Path) -> Iterator[str] | None:
     return diff
 
 
+default_compare_files: CompareFilesFn = functools.partial(compare_files, ignore_restrict=True)
+
+
 def _verify_migration(
     database: str,
     schemas: list[str],
@@ -71,7 +82,7 @@ def _verify_migration(
     down_file: Path,
     dump_dir: Path,
     *,
-    compare_files_fn: CompareFilesFn = compare_files,
+    compare_files_fn: CompareFilesFn = default_compare_files,
 ):
     _before_dump, _after_dump = (
         f"{migration_id}-before.sql",
@@ -117,7 +128,7 @@ def migrate_verify(
     migration_folder: Path,
     *,
     only_last: bool = False,
-    compare_files_fn: CompareFilesFn = compare_files,
+    compare_files_fn: CompareFilesFn = default_compare_files,
     skip_down_restore: bool = False,
 ):
     """
@@ -133,8 +144,12 @@ def migrate_verify(
     _nb_migrations = int(len(migration_files) / 2)
     try:
         for i, (_up_file, _down_file) in enumerate(iter_migration_files(migration_files)):
-            # We verify all if only_last is False or if we only have one migration (up/down)
-            _skip = only_last and i != _nb_migrations - 1 and len(migration_files) != 2
+            _skip = (
+                _down_file.skip_verify
+                or
+                # We verify all if only_last is False or if we only have one migration (up/down)
+                (only_last and i != _nb_migrations - 1 and len(migration_files) != 2)
+            )
             if not _skip:
                 logs.info(f"Checking migration {i + 1}/{_nb_migrations}")
                 _verify_migration(
@@ -190,7 +205,7 @@ async def _get_latest_migration(conn: Connection):
     except UndefinedTableError as e:
         if 'relation "public.migration" does not exist' in str(e):
             raise NoSetupTableError(
-                'Could not find table table "public.migration", did you forget to setup the table'
+                'Could not find table "public.migration", did you forget to setup the table'
                 ' by running "migration setup" ?'
             )
         else:
@@ -284,7 +299,7 @@ async def get_applied_migrations(conn: asyncpg.Connection) -> list[AppliedMigrat
     except UndefinedTableError as e:
         if 'relation "public.migration" does not exist' in str(e):
             raise NoSetupTableError(
-                'Could not find table table "public.migration", did you forget to setup the table'
+                'Could not find table "public.migration", did you forget to setup the table'
                 ' by running "migration setup" ?'
             )
         else:
@@ -376,8 +391,11 @@ async def get_missing_migrations(conn: asyncpg.Connection, folder: Path, *, chun
     for chunk in get_chunks(files, size=chunk_size, as_list=True):
         file_ids = await conn.fetch(
             """
-        SELECT file_id from migration where migration_type = 'up' and file_id = any($1)
-        """,
+            SELECT file_id
+            from migration
+            where migration_type = 'up'
+              and file_id = any ($1)
+            """,
             [file.file_id for file in chunk],
         )
         file_ids_db = set(file["file_id"] for file in file_ids)

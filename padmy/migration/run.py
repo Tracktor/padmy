@@ -32,7 +32,8 @@ def new_sql_file(
     """
     from .new_sql import create_sql_file
 
-    create_sql_file(sql_dir, position)
+    new_file = create_sql_file(sql_dir, position)
+    logs.info(f"Created new sql file: {new_file}")
 
 
 @migration.command(cmd="apply-sql")
@@ -52,7 +53,10 @@ async def apply_sql_files(
 
 @migration.command(cmd="new", help="Creates 2 new files for a migration (up and down)")
 def new_migrate_file(
-    migration_folder: Path = MigrationDir, version: str = Option(None, "--version", help="Version of the migration")
+    migration_folder: Path = MigrationDir,
+    version: str | None = Option(None, "--version", help="Version of the migration"),
+    user_email: str | None = Option(None, "--author", help="Author of the migration"),
+    skip_verify: bool = Option(False, "--skip-verify", help="Should the down file be verified or not"),
 ):
     """
     Creates 2 new files for a migration (up and down).
@@ -62,7 +66,7 @@ def new_migrate_file(
     """
     from .create_files import create_new_migration
 
-    create_new_migration(migration_folder, version=version)
+    create_new_migration(migration_folder, version=version, user_email=user_email, skip_verify=skip_verify)
 
 
 @migration.command(cmd="up", help="Migrate database to the new schema")

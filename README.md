@@ -113,28 +113,41 @@ will be applied.
 Now that we are all setup, let's create our first sql file that will create the schema:
 
 ```bash
-poetry run cli -vv migrate new-sql 1 --sql-dir /tmp/sql
+rm -rf /tmp/sql
+mkdir /tmp/sql
+poetry run cli -v migrate new-sql 1 --sql-dir /tmp/sql
+tree /tmp/sql
 ```  
 
+
+
 Add `CREATE SCHEMA general;` to the file.
+
+```bash
+echo "CREATE SCHEMA general;" >> /tmp/sql/0001_new_file.sql
+cat /tmp/sql/0001_new_file.sql
+```
 
 Then apply the modifications to the database:
 
 ```bash
-poetry run cli -vv migrate apply-sql --sql-dir /tmp/sql --db postgres 
+poetry run cli -v migrate apply-sql --sql-dir /tmp/sql --db postgres 
 ```
 
-Notes:
-This will run through all the files in the `/tmp/sql` folder (in order) run them.
-Sql files here **need to be IDEMPOTENT**
+> [!WARNING]
+> This will run through all the files in the `/tmp/sql` folder (in order) run them.
+> Sql files here **need to be IDEMPOTENT**
 
 **Creating a first migration**
 
 Now, lets create our first migration:
 
 ```bash
-mkdir -p /tmp/migrations # You can choose a different folder to store your migrations
-poetry run cli -vv migrate new --sql-dir /tmp/migrations
+migration_dir="/tmp/migrations"
+rm -rf "$migration_dir"
+mkdir "$migration_dir" # You can choose a different folder to store your migrations
+poetry run cli -v migrate new --sql-dir "$migration_dir" --author padmy
+tree "$migration_dir"
 ```
 
 This will create 2 new files:
@@ -142,6 +155,13 @@ This will create 2 new files:
 - **up**: `{timestamp}-{migration_id}-up.sql` that contains your
   migration to apply to the database.
 - **down**: `{timestamp}-{migration_id}-down.sql` that contains the code to revert your changes.
+
+> [!NOTE]  
+> A migration contains:
+> - a reference to the previous file (if any): `-- Prev-file: {timestamp}-{migration_id}`
+> - the name of the author who created the migration: `-- Author: {author}`
+> - (optionally) should the down migration be ignored: `-- Skip-verify: {reason}`
+
 
 Let's now modify the `up.sql` file with:
 
@@ -159,10 +179,26 @@ CREATE TABLE IF NOT EXISTS general.test2
 );
 ```
 
+```bash
+file="$migration_dir/$(ls "$migration_dir" | grep up.sql)"
+printf "\n" >> "$file"
+cat <<'SQL' >> "$file"
+CREATE TABLE IF NOT EXISTS general.test (
+    id  INT PRIMARY KEY,
+    foo INT
+);
+
+CREATE TABLE IF NOT EXISTS general.test2 (
+    id  SERIAL PRIMARY KEY,
+    foo TEXT
+);
+SQL
+```
+
 and check that the migration is valid:
 
 ```bash
-poetry run cli -vv migrate verify --sql-dir /tmp/migrations
+poetry run cli -v migrate verify --sql-dir /tmp/migrations --schemas general
 ``` 
 
 Because we did not add anything to the `down.sql` file, the command returns an error.
