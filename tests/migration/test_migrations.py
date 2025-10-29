@@ -91,7 +91,7 @@ def test_migrate_setup(engine, loop, aengine):
 
 @pytest.mark.usefixtures("setup_test_schema")
 @pytest.mark.parametrize("only_last", [True, False])
-def test_migrate_verify_valid(monkeypatch, engine, tmp_path, only_last):
+def test_migrate_verify_valid(tmp_path, only_last):
     from padmy.migration import migrate_verify
     from padmy.migration.migration import MigrationError
 
@@ -118,7 +118,7 @@ def test_migrate_verify_valid(monkeypatch, engine, tmp_path, only_last):
 
 
 @pytest.mark.usefixtures("setup_test_schema")
-def test_migrate_verify_valid_skip(monkeypatch, engine, tmp_path):
+def test_migrate_verify_valid_skip(tmp_path):
     from padmy.migration import migrate_verify
     from padmy.utils import PGError
 
