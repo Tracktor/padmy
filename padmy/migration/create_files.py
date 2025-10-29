@@ -28,18 +28,22 @@ def _get_last_migration_name(folder: Path) -> str | None:
     return up_file.path.name
 
 
-def create_new_migration(folder: Path, version: str | None = None) -> tuple[Path, Path]:
+def create_new_migration(
+    folder: Path,
+    version: str | None = None,
+    user_email: str | None = None,
+) -> tuple[Path, Path]:
     """
     Creates 2 new files, up and down
     """
     folder.mkdir(exist_ok=True, parents=True)
 
     _base_name = MigrationFile.generate_base_name(ts=int(time.time()))
-    CONSOLE.print(f"\nCreating new migration file ([green]{escape(_base_name)}[/green]):\n")
+    CONSOLE.print(f"\nCreating new migration file ([green]{escape(_base_name)}[/green])\n")
 
     last_migration = _get_last_migration_name(folder)
     logs.debug(f"Last migration files: {last_migration}")
-    author = _get_user_email()
+    author = user_email or _get_user_email()
     logs.debug(f"User email: {author}")
 
     up_file = folder / Path(f"{_base_name}-up.sql")
