@@ -31,7 +31,12 @@ __all__ = (
 )
 
 
-PREFIXES = {"author": "-- Author:", "prev-file": "-- Prev-file:", "version": "-- Version:"}
+PREFIXES = {
+    "author": "-- Author:",
+    "prev-file": "-- Prev-file:",
+    "version": "-- Version:",
+    "skip-verify": "-- Skip-verify:",
+}
 
 
 def get_git_email():
@@ -43,6 +48,12 @@ class Header:
     prev_file: str | None
     author: str | None
     version: str | None
+    skip_verify: bool = False
+    skip_reason: str | None = None
+
+    def __post_init__(self):
+        if self.skip_verify and self.skip_reason is None:
+            self.skip_reason = "no reason provided"
 
     @property
     def is_empty(self):
@@ -53,6 +64,8 @@ class Header:
         prev_file = None
         author = None
         version = None
+        skip_verify = False
+        skip_reason = None
         for line in text.split("\n"):
             if line.startswith(PREFIXES["prev-file"]):
                 prev_file = line.split(":")[1].strip()
@@ -60,7 +73,10 @@ class Header:
                 author = line.split(":")[1].strip()
             elif line.startswith(PREFIXES["version"]):
                 version = line.split(":")[1].strip()
-        return cls(prev_file, author, version)
+            elif line.startswith(PREFIXES["skip-verify"]):
+                skip_reason = line.split(":")[1].strip().lower()
+                skip_verify = True
+        return cls(prev_file, author, version, skip_verify=skip_verify, skip_reason=skip_reason)
 
     def as_text(self):
         _header = [
@@ -69,6 +85,8 @@ class Header:
         ]
         if self.version is not None:
             _header.append(f"{PREFIXES['version']} {self.version}")
+        if self.skip_verify:
+            _header.append(f"{PREFIXES['skip-verify']} {self.skip_reason or 'no reason provided'}")
 
         file_header = textwrap.dedent("\n".join(_header)).strip()
         return file_header
@@ -85,6 +103,10 @@ class MigrationFile:
     @property
     def name(self):
         return f"{int(self.ts.timestamp())}-{self.file_id}-{self.file_type}.sql"
+
+    @property
+    def skip_verify(self) -> bool:
+        return self.header.skip_verify if self.header else False
 
     def replace_ts(self, ts: dt.datetime):
         self.ts = ts

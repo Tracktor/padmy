@@ -262,8 +262,7 @@ def test_get_columns(loop, engine, aengine, table, expected):
     async def _test():
         return await get_columns(aengine, [Table("cschema", "table_1")])
 
-    columns = loop.run_until_complete(_test())
-    print(columns)
+    loop.run_until_complete(_test())
 
 
 @pytest.mark.usefixtures("setup_tables", "clean_migration")

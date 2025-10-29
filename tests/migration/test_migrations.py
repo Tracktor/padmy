@@ -10,7 +10,12 @@ import pytest
 from tracktolib.pg_sync import fetch_all, insert_one, insert_many
 
 from padmy.migration.utils import parse_filename, MigrationFileError
-from .conftest import VALID_MIGRATIONS_DIR, INVALID_MIGRATIONS_DIR, INVALID_MIGRATIONS_DIR_MULTIPLE
+from .conftest import (
+    VALID_MIGRATIONS_DIR,
+    INVALID_MIGRATIONS_DIR,
+    INVALID_MIGRATIONS_DIR_MULTIPLE,
+    VALID_MIGRATIONS_SKIP_DIR,
+)
 from ..conftest import PG_DATABASE
 from ..utils import check_table_exists, check_column_exists
 
@@ -105,6 +110,31 @@ def test_migrate_verify_valid(monkeypatch, engine, tmp_path, only_last):
     except MigrationError as e:
         print(e.diff)
         raise e
+
+
+@pytest.mark.usefixtures("setup_test_schema")
+def test_migrate_verify_valid_skip(monkeypatch, engine, tmp_path):
+    from padmy.migration import migrate_verify
+    from padmy.utils import PGError
+
+    migrate_verify(
+        database=PG_DATABASE,
+        schemas=["general"],
+        dump_dir=tmp_path,
+        migration_folder=VALID_MIGRATIONS_SKIP_DIR,
+        only_last=True,
+        skip_down_restore=True,
+    )
+    # Should raise an error since the down file is not skipped
+    with pytest.raises(PGError, match=r'ERROR:  column "baz" of relation "test" already exists'):
+        migrate_verify(
+            database=PG_DATABASE,
+            schemas=["general"],
+            dump_dir=tmp_path,
+            migration_folder=VALID_MIGRATIONS_SKIP_DIR,
+            only_last=True,
+            skip_down_restore=True,
+        )
 
 
 @pytest.mark.usefixtures("setup_test_schema")

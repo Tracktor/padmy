@@ -447,3 +447,14 @@ def extract_pg_error(msg: str) -> list[str]:
         errors.append(_clean_str(current_error))
 
     return errors
+
+
+def remove_restrict_clauses(dump_path: Path) -> None:
+    r"""Remove \restrict and \unrestrict clauses from a pg_dump file."""
+    content = dump_path.read_text()
+    filtered_lines = [
+        line
+        for line in content.splitlines()
+        if not (line.strip().startswith(r"\restrict") or line.strip().startswith(r"\unrestrict"))
+    ]
+    dump_path.write_text("\n".join(filtered_lines))

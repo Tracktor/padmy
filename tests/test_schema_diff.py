@@ -77,7 +77,7 @@ def diffs(no_diffs, engine_to):
             [
                 "--- from_db-from.sql\n",
                 "+++ to_db-to.sql\n",
-                "@@ -45,7 +45,8 @@\n",
+                "@@ -46,7 +46,8 @@\n",
                 " CREATE TABLE schema1.table_1 (",
                 "     id integer NOT NULL,",
                 "-    foo text NOT NULL",
@@ -98,7 +98,7 @@ def test_schema_differences(tmp_path, request, patch_scenario, expected_diff):
         PG_URL, database=FROM_DB, schemas=["schema1", "schema2"], dump_dir=tmp_path, db_to=TO_DB, no_privileges=True
     )
     if expected_diff is None:
-        assert diff is None
+        assert diff is None, f"Expected no diff, but got: {list(diff)}"
     else:
         _diff = [line for line in (diff or []) if line.strip()]
         assert _diff == expected_diff

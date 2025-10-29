@@ -15,6 +15,7 @@ def migration_dir(tmp_path):
 VALID_MIGRATIONS_DIR = STATIC_DIR / "migrations" / "valid"
 INVALID_MIGRATIONS_DIR = STATIC_DIR / "migrations" / "invalid-simple"
 INVALID_MIGRATIONS_DIR_MULTIPLE: Path = STATIC_DIR / "migrations" / "invalid-multiple"
+VALID_MIGRATIONS_SKIP_DIR = STATIC_DIR / "migrations" / "valid-skip"
 
 
 @pytest.fixture()
