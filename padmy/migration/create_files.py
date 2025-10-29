@@ -32,6 +32,7 @@ def create_new_migration(
     folder: Path,
     version: str | None = None,
     user_email: str | None = None,
+    skip_verify: bool = False,
 ) -> tuple[Path, Path]:
     """
     Creates 2 new files, up and down
@@ -49,9 +50,10 @@ def create_new_migration(
     up_file = folder / Path(f"{_base_name}-up.sql")
     down_file = folder / Path(f"{_base_name}-down.sql")
 
-    _header = Header(last_migration, author, version).as_text()
-    up_file.write_text(_header)
-    down_file.write_text(_header.replace("-up", "-down"))
+    _header = Header(last_migration, author, version)
+    up_file.write_text(_header.as_text())
+    _header.skip_verify = skip_verify
+    down_file.write_text(_header.as_text().replace("-up", "-down"))
 
     CONSOLE.print("\nNew files created!\n")
     return up_file, down_file

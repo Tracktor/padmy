@@ -64,16 +64,21 @@ def test_create_new_migration(monkeypatch, migration_dir, capsys, version):
     down_content = [x.rstrip() for x in down_file.open().readlines() if x.strip()]
     assert down_content == ["-- Prev-file:", f"-- Author: {TEST_EMAIL}"] + _optional_args
 
-    # Creating second migration
+    # Creating second migration with skip verify
 
-    create_new_migration(folder=migration_dir, version=version)
+    create_new_migration(folder=migration_dir, version=version, skip_verify=True)
     new_files = list(migration_dir.glob("*.sql"))
     assert capsys.readouterr().out.strip().startswith("Creating new migration file")
     up_file2, down_file2 = sorted(new_files, key=lambda x: x.name, reverse=True)[:2]
     up_content = [x.rstrip() for x in up_file2.open().readlines() if x.strip()]
     assert up_content == [f"-- Prev-file: {up_file.name}", f"-- Author: {TEST_EMAIL}"] + _optional_args
     down_content = [x.rstrip() for x in down_file2.open().readlines() if x.strip()]
-    assert down_content == [f"-- Prev-file: {down_file.name}", f"-- Author: {TEST_EMAIL}"] + _optional_args
+    assert down_content == [
+        f"-- Prev-file: {down_file.name}",
+        f"-- Author: {TEST_EMAIL}",
+        *_optional_args,
+        "-- Skip-verify: no reason provided",
+    ]
 
 
 @pytest.mark.usefixtures("clean_migration")
