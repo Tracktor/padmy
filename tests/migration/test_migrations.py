@@ -177,7 +177,7 @@ def test_migrate_verify(engine, tmp_path, only_last, migration_dir, error_msg):
 
 
 SETUP_ERROR_MSG = re.escape(
-    'Could not find table table "public.migration", did you forget to setup the table by running "migration setup" ?'
+    'Could not find table "public.migration", did you forget to setup the table by running "migration setup" ?'
 )
 
 
