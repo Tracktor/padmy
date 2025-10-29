@@ -188,7 +188,7 @@ async def get_columns(conn: asyncpg.Connection, tables: list[Table]) -> dict[str
            JSON_AGG(
                    JSON_BUILD_OBJECT(
                            'name', column_name,
-                           'is_generated', generation_expression IS NOT NULL OR identity_generation = 'ALWAYS'
+                           'is_generated', COALESCE(generation_expression IS NOT NULL OR identity_generation = 'ALWAYS', FALSE)
                        )
                ) AS columns
     FROM (SELECT *, table_schema || '.' || table_name AS full_name FROM information_schema.columns) t

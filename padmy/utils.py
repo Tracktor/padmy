@@ -457,4 +457,7 @@ def remove_restrict_clauses(dump_path: Path) -> None:
         for line in content.splitlines()
         if not (line.strip().startswith(r"\restrict") or line.strip().startswith(r"\unrestrict"))
     ]
-    dump_path.write_text("\n".join(filtered_lines))
+    result = "\n".join(filtered_lines)
+    if content.endswith("\n"):
+        result += "\n"
+    dump_path.write_text(result)

@@ -254,7 +254,7 @@ def test_load_pk_constraints(name, table, expected, aengine, engine, loop):
 )
 @pytest.mark.usefixtures("setup_tmp_schema")
 def test_get_columns(loop, engine, aengine, table, expected):
-    from padmy.db import get_columns, Table
+    from padmy.db import get_columns, Table, Column
 
     engine.execute(table)
     engine.commit()
@@ -262,7 +262,8 @@ def test_get_columns(loop, engine, aengine, table, expected):
     async def _test():
         return await get_columns(aengine, [Table("cschema", "table_1")])
 
-    assert loop.run_until_complete(_test())
+    result = loop.run_until_complete(_test())
+    assert result == {"cschema.table_1": [Column(**c) for c in expected]}
 
 
 @pytest.mark.usefixtures("setup_tables", "clean_migration")

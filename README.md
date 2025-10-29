@@ -159,7 +159,7 @@ This will create 2 new files:
 > [!NOTE]  
 > A migration contains:
 > - a reference to the previous file (if any): `-- Prev-file: {timestamp}-{migration_id}`
-> - the name of the author that created the migration: `-- Author: {author}`
+> - the name of the author who created the migration: `-- Author: {author}`
 > - (optionally) should the down migration be ignored: `-- Skip-verify: {reason}`
 
 

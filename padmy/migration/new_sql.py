@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 
@@ -34,5 +33,5 @@ def create_sql_file(sql_dir: Path, position: int) -> Path:
             _file.rename(f"{sql_dir}/{_curr_pos + 1:04}_{_file_name}")
 
     _new_file = sql_dir / f"{position:04}_new_file.sql"
-    os.close(os.open(_new_file, os.O_CREAT))
+    _new_file.touch()
     return _new_file

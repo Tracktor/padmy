@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# DESCRIPTION: A helper script to run spinup the test environement.
+# DESCRIPTION: A helper script to spin up the test environment.
 # USAGE: ./bin/docker.sh [docker-compose-args]
 
 

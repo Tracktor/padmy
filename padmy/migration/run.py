@@ -54,8 +54,8 @@ async def apply_sql_files(
 @migration.command(cmd="new", help="Creates 2 new files for a migration (up and down)")
 def new_migrate_file(
     migration_folder: Path = MigrationDir,
-    version: str = Option(None, "--version", help="Version of the migration"),
-    user_email: str = Option(None, "--author", help="Author of the migration"),
+    version: str | None = Option(None, "--version", help="Version of the migration"),
+    user_email: str | None = Option(None, "--author", help="Author of the migration"),
 ):
     """
     Creates 2 new files for a migration (up and down).

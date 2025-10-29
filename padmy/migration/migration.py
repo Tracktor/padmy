@@ -118,9 +118,6 @@ def _verify_migration(
 
     _diff = compare_files_fn(_before_dump_file, _after_dump_file)
     if _diff is not None:
-        import pprint
-
-        pprint.pprint("\n".join(_diff))
         raise MigrationError(f"Difference found for migration: {migration_id}", diff="\n".join(_diff))
 
 
