@@ -21,11 +21,11 @@ pytz = { version = "^2024.1", python = "<3.12" }
 network = ["networkx", "dash", "dash-cytoscape"]
 
 [tool.poetry.group.dev.dependencies]
-pyright = "^1.1.352"
+pyright = "^1.1.407"
 pytest = "^7.1.2"
 pytest-cov = "^4.0.0"
 deepdiff = "^5.8.1"
-ruff = "^0.8.2"
+ruff = "^0.14.2"
 commitizen = "^3.13.0"
 psycopg = "^3.1.12"
 tracktolib = { version = ">=0.41.0", extras = ["pg-sync"] }
