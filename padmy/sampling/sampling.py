@@ -99,7 +99,7 @@ def get_insert_child_fk_data_query(table: Table, child_table: Table) -> str:
     query = (
         f"""
     INSERT INTO {table.tmp_name} ({table.values})
-    SELECT {table.get_values('t')} from {table.full_name} t
+    SELECT {table.get_values("t")} from {table.full_name} t
     """
         + "\n".join(joins)
         + "\n ON CONFLICT DO NOTHING"
@@ -245,7 +245,7 @@ async def create_temp_tables(
                     logs.error(f"\t {c.full_name} ({c.has_been_processed})")
             raise ValueError(
                 "Cyclic foreign keys detected. "
-                f'Possible tables are: {", ".join(x.full_name for x in _not_processed)}. '
+                f"Possible tables are: {', '.join(x.full_name for x in _not_processed)}. "
                 "Run `analyze` with `--show-graphs` to debug."
             )
 
@@ -280,7 +280,7 @@ async def sample_database(
         if _not_processed_tables:
             raise NotImplementedError(
                 f"Found {len(_not_processed_tables)} tables that has not been "
-                f'processed: {", ".join(_not_processed_tables)}'
+                f"processed: {', '.join(_not_processed_tables)}"
             )
         #
         _table_count: dict[str, int] = {}
