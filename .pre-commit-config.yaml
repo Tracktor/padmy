@@ -7,7 +7,7 @@ repos:
     rev: v0.14.5
     hooks:
       - id: ruff
-        language_version: python3.12
+        language_version: python3.13
         args:
           - --fix
       - id: ruff-format
