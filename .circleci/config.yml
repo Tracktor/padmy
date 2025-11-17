@@ -142,7 +142,7 @@ jobs:
             - padmy-{{ checksum "pyproject.toml" }}
       - run:
           name: Publishing
-          command: uv publish -u __token__ -p $PYPI_TOKEN
+          command: uv publish --token $PYPI_TOKEN
 
 
 workflows:
