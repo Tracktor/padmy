@@ -1,39 +1,48 @@
-[tool.poetry]
+[project]
 name = "padmy"
 version = "0.20.0"
-description = ""
-authors = ["andarius <julien.brayere@tracktor.fr>"]
+authors = [
+    { email = "julien.brayere@tracktor.fr" }
+]
+requires-python = ">=3.10"
+dependencies = [
+    "piou >=0.21.0,<1.0.0",
+    "asyncpg >=0.29.0,<1.0.0",
+    "PyYAML >=6.0.2,<7.0",
+    "typing-extensions >=4.3.0",
+    "Faker >=13.15.1,<14.0.0",
+    "tracktolib >=0.42.1,<1.0.0",
+    "pytz >=2024.1,<2025.0 ; python_version < '3.12'"
+]
 
-[tool.poetry.dependencies]
-python = "^3.10"
-piou = ">=0.13.4,<1.0.0"
-asyncpg = ">=0.28.0"
-PyYAML = ">=6.0"
-typing-extensions = ">=4.3.0"
-networkx = { version = ">=3.1.0", optional = true }
-dash = { version = ">=2.6.0", optional = true }
-dash-cytoscape = { version = ">=0.3.0", optional = true }
-Faker = ">=13.15.1"
-tracktolib = { version = ">=0.42.1" }
-pytz = { version = "^2024.1", python = "<3.12" }
 
-[tool.poetry.extras]
-network = ["networkx", "dash", "dash-cytoscape"]
+[dependency-groups]
+dev = [
+    "pytest >=9.0.1,<10.0.0",
+    "pytest-cov >=7.0.0,<8.0.0",
+    "pyright >=1.1.407,<2.0.0",
+    "ruff >=0.14.5,<1.0.0",
+    "commitizen >=4.10.0,<5",
+    "deepdiff >=8.6.1,<9",
+    "tracktolib >=0.46.0,<1.0.0",
+    "psycopg >=3.2.12,<4.0.0",
+    "pre-commit>=4.4.0",
+]
 
-[tool.poetry.group.dev.dependencies]
-pyright = "^1.1.407"
-pytest = "^7.1.2"
-pytest-cov = "^4.0.0"
-deepdiff = "^5.8.1"
-ruff = "^0.14.2"
-commitizen = "^3.13.0"
-psycopg = "^3.1.12"
-tracktolib = { version = ">=0.41.0", extras = ["pg-sync"] }
+network = [
+    "networkx >=3.1.0,<4.0.0",
+    "dash >=2.6.0,<3.0.0",
+    "dash-cytoscape >=0.3.0,<1.0.0"
+]
+
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["uv_build>=0.9.4,<0.10.0"]
+build-backend = "uv_build"
 
+[tool.uv.build-backend]
+module-name = "padmy"
+module-root = ""
 
 [tool.pytest.ini_options]
 addopts = "--cov=padmy -s -q -x"
@@ -46,14 +55,9 @@ python_files = "*.py"
 include = ["padmy", "tests"]
 exclude = []
 
-pythonVersion = "3.11"
+pythonVersion = "3.13"
 pythonPlatform = "Linux"
 useLibraryCodeForTypes = true
-
-[tool.poetry.scripts]
-cli = 'run:run'
-padmy = 'run:run'
-
 
 
 [tool.commitizen]
@@ -68,7 +72,7 @@ bump_message = "release $current_version → $new_version [skip ci]"
 
 [tool.ruff]
 line-length = 120
-target-version = "py310"
+target-version = "py313"
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = [

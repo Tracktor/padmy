@@ -14,7 +14,7 @@ def restore_log_lvl():
 
 
 def test_run_anonymize():
-    from run import cli
+    from padmy.run import cli
 
     cli.run_with_args("anonymize", "--db", "test", "-f", str(STATIC_DIR / "config.yml"), "-p", PG_PASSWORD)
 
@@ -31,7 +31,7 @@ def setup_test_schemas(engine):
 
 @pytest.mark.usefixtures("setup_test_db", "setup_test_schemas")
 def test_run_sample(capsys, loop):
-    from run import cli
+    from padmy.run import cli
 
     cli.run_with_args(
         "sample",
@@ -49,7 +49,7 @@ def test_run_sample(capsys, loop):
 
 
 def test_run_copy_db(capsys):
-    from run import cli
+    from padmy.run import cli
 
     cli.run_with_args("copy-db", "--db", "test", "--db-to", "test2", "--schemas", "public")
     capsys.readouterr()
@@ -57,6 +57,6 @@ def test_run_copy_db(capsys):
 
 
 def test_run_schema_diff():
-    from run import cli
+    from padmy.run import cli
 
     cli.run_with_args("schema-diff", "--db", "test", "--schemas", "public")
