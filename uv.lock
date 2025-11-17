@@ -738,8 +738,10 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
-dev = [
+bump = [
     { name = "commitizen" },
+]
+dev = [
     { name = "deepdiff" },
     { name = "pre-commit" },
     { name = "psycopg" },
@@ -769,8 +771,8 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
+bump = [{ name = "commitizen", specifier = ">=4.10.0,<5" }]
 dev = [
-    { name = "commitizen", specifier = ">=4.10.0,<5" },
     { name = "deepdiff", specifier = ">=8.6.1,<9" },
     { name = "pre-commit", specifier = ">=4.4.0" },
     { name = "psycopg", specifier = ">=3.2.12,<4.0.0" },
