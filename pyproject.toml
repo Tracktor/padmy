@@ -15,19 +15,22 @@ dependencies = [
     "pytz >=2024.1,<2025.0 ; python_version < '3.12'"
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pytest >=7.4.0,<8.0.0",
-    "pytest-cov >=4.0.0,<5.0.0",
-    "pyright >=1.1.407,<2.0.0",
-    "ruff >=0.14.2,<1.0.0",
-    "commitizen >=3.13.0,<4.0.0",
-    "pre-commit >=4.3.0,<5.0.0",
-    "deepdiff >=5.8.1,<6.0.0",
-    "tracktolib >=0.41.0,<1.0.0",
-    "psycopg >=3.1.12,<4.0.0"
 
+[dependency-groups]
+dev = [
+    "pytest >=9.0.1,<10.0.0",
+    "pytest-cov >=7.0.0,<8.0.0",
+    "pyright >=1.1.407,<2.0.0",
+    "ruff >=0.14.5,<1.0.0",
+    "commitizen >=4.10.0,<5",
+    "deepdiff >=8.6.1,<9",
+    "tracktolib >=0.46.0,<1.0.0",
+    "psycopg >=3.2.12,<4.0.0",
+    "pre-commit>=4.4.0",
 ]
+
+
+[project.optional-dependencies]
 network = [
     "networkx >=3.1.0,<4.0.0",
     "dash >=2.6.0,<3.0.0",
