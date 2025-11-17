@@ -2,7 +2,9 @@
 # check=error=true
 #
 # Multi-version PostgreSQL client Dockerfile
-# Build with: docker buildx build --build-arg PG_VERSION=15 -t padmy:pg15 -f docker/Dockerfile .
+# Build with:
+#  - default: docker buildx build --build-arg PG_VERSION=15 -t padmy:pg15 -f docker/Dockerfile .
+#  - with networkx: docker buildx build --build-arg PG_VERSION=15 --build-arg UV_PARAMS="--group network" -t padmy:pg15 -f docker/Dockerfile .
 # Supported PG_VERSION values: 15, 16, 17
 #
 FROM ghcr.io/astral-sh/uv:python3.13-alpine AS builder
@@ -20,8 +22,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-install-project --no-dev ${UV_PARAMS}
 
 # Copy project files
-ADD pyproject.toml uv.lock ./
-ADD padmy/ padmy/
+COPY pyproject.toml uv.lock ./
+COPY padmy/ padmy/
 
 # Install the project to system Python
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -29,6 +31,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 
 FROM python:3.13-alpine AS main
+
+
+WORKDIR /app
 
 # PostgreSQL version to install (15, 16, or 17)
 ARG PG_VERSION=17
@@ -46,7 +51,7 @@ RUN if [ "$PG_VERSION" = "15" ]; then \
 COPY --from=builder /usr/local/lib/python3.13/site-packages/ /usr/local/lib/python3.13/site-packages/
 COPY --from=builder /usr/local/bin/ /usr/local/bin/
 
-ADD padmy/ padmy/
+COPY padmy/ padmy/
 
 USER user
 
