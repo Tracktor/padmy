@@ -33,7 +33,7 @@ executors:
 
   build-docker:
     docker:
-      - image: cimg/base:current
+      - image: cimg/python:3.13-node
 
   build-wheel:
     docker:
