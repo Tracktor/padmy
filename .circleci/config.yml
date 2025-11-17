@@ -66,7 +66,7 @@ jobs:
             wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
             sudo apt-get update && sudo apt-get install postgresql-client-17
       - sre/run-python-tests:
-          extras: '--quiet'
+          extras: '--quiet --all-groups --all-extras'
           formatter: 'ruff'
           tool: 'uv'
           before-steps:
