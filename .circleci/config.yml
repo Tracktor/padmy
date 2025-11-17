@@ -97,6 +97,12 @@ jobs:
       - setup_remote_docker:
           docker_layer_caching: true
       - checkout
+      - run:
+          name: Extract version from pyproject.toml
+          command: |
+            VERSION=$(uv version --short)
+            echo "export VERSION=$VERSION" >> $BASH_ENV
+            echo "Building version: $VERSION"
       - attach_workspace:
           at: .
       - sre/build-docker:
