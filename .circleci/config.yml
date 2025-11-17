@@ -2,7 +2,7 @@ version: 2.1
 
 orbs:
   gh: circleci/github-cli@1.0
-  sre: tracktor/ci-tools@0.7.2
+  sre: tracktor/ci-tools@0.11.2
 
 references:
   production_context: &production_context
@@ -37,11 +37,11 @@ executors:
 
   build-wheel:
     docker:
-      - image: cimg/python:3.10.12-node
+      - image: cimg/python:3.13-node
 
   tests:
     docker:
-      - image: cimg/python:3.10.12-node
+      - image: cimg/python:3.13-node
         environment:
           PYRIGHT_PYTHON_GLOBAL_NODE: true
       - image: cimg/postgres:17.0-postgis
@@ -66,8 +66,9 @@ jobs:
             wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
             sudo apt-get update && sudo apt-get install postgresql-client-17
       - sre/run-python-tests:
-          extras: '--all-extras --quiet'
+          extras: '--quiet'
           formatter: 'ruff'
+          tool: 'uv'
           before-steps:
             - run:
                 name: Initializing DB
@@ -79,137 +80,31 @@ jobs:
                   INIT_FILE: ./tests/init.sql
                   SQL_FOLDER: ./tests/static
 
-  # Docker Images
-
-  export-requirements:
-    executor: build-wheel
-    steps:
-      - checkout
-      - sre/export-poetry:
-          extras: '--without-hashes'
-
-  export-requirements-network:
-    executor: build-wheel
-    steps:
-      - checkout
-      - sre/export-poetry:
-          extras: '--without-hashes -E network'
-
   # Publish
 
-  ## PG 15
-
-  build-publish-docker-15:
+  build-publish-docker:
     executor: build-docker
+    parameters:
+      pg_version:
+        type: string
+      include_network:
+        type: boolean
+        default: false
     steps:
       - setup_remote_docker:
           docker_layer_caching: true
       - checkout
       - attach_workspace:
           at: .
-      - sre/load-poetry-version
       - sre/build-docker:
-          dockerfile: './docker/pg-15/Dockerfile'
+          dockerfile: './docker/Dockerfile'
           image_name: 'tracktor/padmy'
-          tag: ${VERSION}-15
-          latest_tag: 'latest-15'
+          tag: <<# parameters.include_network >>${VERSION}-network-<< parameters.pg_version >><</ parameters.include_network >><<^ parameters.include_network >>${VERSION}-<< parameters.pg_version >><</ parameters.include_network >>
+          latest_tag: <<# parameters.include_network >>latest-network-<< parameters.pg_version >><</ parameters.include_network >><<^ parameters.include_network >>latest-<< parameters.pg_version >><</ parameters.include_network >>
           publish: true
           registry_pwd: $CONTAINER_REGISTRY_PWD
           registry_user: $CONTAINER_REGISTRY_USER
-
-  build-publish-docker-network-15:
-    executor: build-docker
-    steps:
-      - setup_remote_docker:
-          docker_layer_caching: true
-      - checkout
-      - attach_workspace:
-          at: .
-      - sre/load-poetry-version
-      - sre/build-docker:
-          dockerfile: './docker/pg-15/Dockerfile'
-          image_name: 'tracktor/padmy'
-          tag: ${VERSION}-network-15
-          latest_tag: 'latest-network-15'
-          publish: true
-          registry_pwd: $CONTAINER_REGISTRY_PWD
-          registry_user: $CONTAINER_REGISTRY_USER
-
-  ## PG 16
-
-  build-publish-docker-16:
-    executor: build-docker
-    steps:
-      - setup_remote_docker:
-          docker_layer_caching: true
-      - checkout
-      - attach_workspace:
-          at: .
-      - sre/load-poetry-version
-      - sre/build-docker:
-          dockerfile: './docker/pg-16/Dockerfile'
-          image_name: 'tracktor/padmy'
-          tag: ${VERSION}-16
-          latest_tag: 'latest-16'
-          publish: true
-          registry_pwd: $CONTAINER_REGISTRY_PWD
-          registry_user: $CONTAINER_REGISTRY_USER
-
-  build-publish-docker-network-16:
-    executor: build-docker
-    steps:
-      - setup_remote_docker:
-          docker_layer_caching: true
-      - checkout
-      - attach_workspace:
-          at: .
-      - sre/load-poetry-version
-      - sre/build-docker:
-          dockerfile: './docker/pg-16/Dockerfile'
-          image_name: 'tracktor/padmy'
-          tag: ${VERSION}-network-16
-          latest_tag: 'latest-network-16'
-          publish: true
-          registry_pwd: $CONTAINER_REGISTRY_PWD
-          registry_user: $CONTAINER_REGISTRY_USER
-
-  ## PG 17
-
-  build-publish-docker-17:
-    executor: build-docker
-    steps:
-      - setup_remote_docker:
-          docker_layer_caching: true
-      - checkout
-      - attach_workspace:
-          at: .
-      - sre/load-poetry-version
-      - sre/build-docker:
-          dockerfile: './docker/pg-17/Dockerfile'
-          image_name: 'tracktor/padmy'
-          tag: ${VERSION}-17
-          latest_tag: 'latest-17'
-          publish: true
-          registry_pwd: $CONTAINER_REGISTRY_PWD
-          registry_user: $CONTAINER_REGISTRY_USER
-
-  build-publish-docker-network-17:
-    executor: build-docker
-    steps:
-      - setup_remote_docker:
-          docker_layer_caching: true
-      - checkout
-      - attach_workspace:
-          at: .
-      - sre/load-poetry-version
-      - sre/build-docker:
-          dockerfile: './docker/pg-17/Dockerfile'
-          image_name: 'tracktor/padmy'
-          tag: ${VERSION}-network-17
-          latest_tag: 'latest-network-17'
-          publish: true
-          registry_pwd: $CONTAINER_REGISTRY_PWD
-          registry_user: $CONTAINER_REGISTRY_USER
+          build_params: --build-arg PG_VERSION=<< parameters.pg_version >><<# parameters.include_network >> --build-arg UV_PARAMS="--group network"<</ parameters.include_network >>
 
 
   # Bump
@@ -221,14 +116,11 @@ jobs:
       - checkout
       - restore_cache:
           keys:
-            - deps-v0-{{ checksum "poetry.lock" }}
-      - run:
-          name: Installing deps
-          command: |
-            poetry install --quiet
+            - deps-v0-{{ checksum "uv.lock" }}
       - sre/bump-version:
           lang: "python"
           branch: "master"
+          tool: "uv"
       - store_artifacts:
           path: dist
       - save_cache:
@@ -247,7 +139,7 @@ jobs:
             - padmy-{{ checksum "pyproject.toml" }}
       - run:
           name: Publishing
-          command: poetry publish -u __token__ -p $PYPI_TOKEN
+          command: uv publish -u __token__ -p $PYPI_TOKEN
 
 
 workflows:
@@ -268,44 +160,39 @@ workflows:
       - publish:
           context: *pypi_context
           filters: *filters_only_tags
-
-      - export-requirements:
-          filters: *filters_only_tags
-      - export-requirements-network:
-          filters: *filters_only_tags
-      - build-publish-docker-15:
-          requires: [
-            export-requirements
-          ]
+      # PostgreSQL 15
+      - build-publish-docker:
+          name: build-publish-docker-15
+          pg_version: "15"
           context: *production_context
           filters: *filters_only_tags
-      - build-publish-docker-network-15:
-          requires: [
-            export-requirements-network
-          ]
+      - build-publish-docker:
+          name: build-publish-docker-network-15
+          pg_version: "15"
+          include_network: true
           context: *production_context
           filters: *filters_only_tags
-      - build-publish-docker-16:
-          requires: [
-            export-requirements
-          ]
+      # PostgreSQL 16
+      - build-publish-docker:
+          name: build-publish-docker-16
+          pg_version: "16"
           context: *production_context
           filters: *filters_only_tags
-      - build-publish-docker-network-16:
-          requires: [
-            export-requirements-network
-          ]
+      - build-publish-docker:
+          name: build-publish-docker-network-16
+          pg_version: "16"
+          include_network: true
           context: *production_context
           filters: *filters_only_tags
-      - build-publish-docker-17:
-          requires: [
-            export-requirements
-          ]
+      # PostgreSQL 17
+      - build-publish-docker:
+          name: build-publish-docker-17
+          pg_version: "17"
           context: *production_context
           filters: *filters_only_tags
-      - build-publish-docker-network-17:
-          requires: [
-            export-requirements-network
-          ]
+      - build-publish-docker:
+          name: build-publish-docker-network-17
+          pg_version: "17"
+          include_network: true
           context: *production_context
           filters: *filters_only_tags

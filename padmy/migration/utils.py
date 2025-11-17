@@ -6,7 +6,7 @@ from typing import Literal, get_args, TypeGuard
 if sys.version_info >= (3, 12):
     UTC = dt.UTC
 else:
-    from pytz import UTC
+    from pytz import UTC  # pyright: ignore[reportMissingModuleSource]
 
 import dataclasses
 import textwrap
