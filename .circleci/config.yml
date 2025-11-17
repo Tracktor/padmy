@@ -2,7 +2,7 @@ version: 2.1
 
 orbs:
   gh: circleci/github-cli@1.0
-  sre: tracktor/ci-tools@0.11.2
+  sre: tracktor/ci-tools@0.13.0
 
 references:
   production_context: &production_context
@@ -65,15 +65,14 @@ jobs:
             # Import the repository signing key:
             wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
             sudo apt-get update && sudo apt-get install postgresql-client-17
-      - run:
-          name: Install dependencies
-          command: |
-            uv sync --all-extras --dev
+
       - sre/run-python-tests:
-          extras: '--quiet'
           formatter: 'ruff'
           tool: 'uv'
           before-steps:
+            - run:
+                name: Install dependencies
+                command: uv sync --locked --all-extras --dev
             - run:
                 name: Initializing DB
                 command: ./tests/static/init-pg.sh
