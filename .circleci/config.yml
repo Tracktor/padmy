@@ -2,7 +2,7 @@ version: 2.1
 
 orbs:
   gh: circleci/github-cli@1.0
-  sre: tracktor/ci-tools@0.13.0
+  sre: tracktor/ci-tools@0.13.1
 
 references:
   production_context: &production_context
