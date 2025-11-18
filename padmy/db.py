@@ -198,6 +198,7 @@ async def get_columns(conn: asyncpg.Connection, tables: list[Table]) -> dict[str
     data = await conn.fetch(query, [x.full_name for x in tables])
     columns = {}
     for x in data:
+        print(x["columns"])
         columns[x["full_name"]] = [Column(**col) for col in x["columns"]]
     return columns
 

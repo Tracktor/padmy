@@ -4,10 +4,10 @@ from pathlib import Path
 from padmy.logs import logs
 from .utils import get_files, utc_now, iter_migration_files, MigrationFile, verify_migration_files, MigrationErrorType
 
-__all__ = ("reorder_files", "reorder_files_by_migrations", "rename_files")
+__all__ = ("reorder_files", "reorder_files_by_applied_migrations", "rename_files", "reorder_files_by_last")
 
 
-def reorder_files_by_migrations(folder: Path, last_migration_ids: list[str]):
+def reorder_files_by_applied_migrations(folder: Path, last_applied_ids: list[str]):
     """
     Reorder the migration files given the last N commits (in descending order).
     For instance, let's say we have the following migration files:
@@ -18,7 +18,7 @@ def reorder_files_by_migrations(folder: Path, last_migration_ids: list[str]):
             0003_file4.sql
             0004_file5.sql
 
-    and we want to reorder the files given the last 2 commits: 0003 and 0001,
+    and we want to reorder the files given the last 2 commits: 0003 and 0001 that have already been applied,
     the new order will be:
 
             0000_file1.sql
@@ -31,10 +31,11 @@ def reorder_files_by_migrations(folder: Path, last_migration_ids: list[str]):
     in the same order as the branch you are currently working on (like develop).
 
     """
-    if not last_migration_ids:
+    if not last_applied_ids:
+        logs.warning("No migration ids provided, skipping reorder")
         return
 
-    _migration_ids = set(last_migration_ids)
+    _migration_ids = set(last_applied_ids)
 
     to_reorder_files, commit_files, after_files = [], [], []
     last_up_file, last_down_file = None, None
@@ -52,12 +53,15 @@ def reorder_files_by_migrations(folder: Path, last_migration_ids: list[str]):
             _migration_ids -= {up_file.file_id}
             commit_files.append((up_file, down_file))
             continue
-        # If the size in unchanged, we did not meet any migration file to reoder
-        if len(_migration_ids) == len(last_migration_ids):
+        # If the size in unchanged, we did not meet any migration file to reorder
+        if len(_migration_ids) == len(last_applied_ids):
             after_files.append((up_file, down_file))
         # Otherwise, we add it to the to_reorder_files list
         else:
             to_reorder_files.append((up_file, down_file))
+
+    if _migration_ids:
+        raise ValueError("Some migration ids were not found")
 
     new_order_files = commit_files + to_reorder_files + after_files
 
@@ -125,3 +129,43 @@ def rename_files(
         if _prev_down_file is not None and _prev_up_file is not None:
             _fix_file((_up_file, _down_file), (_prev_up_file, _prev_down_file), "header")
         _prev_up_file, _prev_down_file = _up_file, _down_file
+
+
+def reorder_files_by_last(folder: Path, last_ids: list[str]):
+    """
+    Reorder the migration files given the last N commits (in descending order).
+    For instance, let's say we have the following migration files:
+
+        0000_file1.sql
+        0001_file2.sql
+        0003_file3.sql
+        0004_file4.sql
+        0005_file5.sql
+
+    And we want to reorder the files given the last 2 commits: 0004 and 003,
+    the new order will be:
+
+        0000_file1.sql
+        0001_file2.sql
+        0005_file5.sql
+        0003_file3.sql <= moved to last -1
+        0004_file4.sql <= moved to last
+    """
+    if not last_ids:
+        logs.warning("No migration ids provided, skipping reorder")
+        return
+    _file_ids = set(last_ids)
+    last_ts = utc_now()
+    for up_file, down_file in iter_migration_files(get_files(folder)):
+        if not _file_ids:
+            break
+        if up_file.file_id in _file_ids:
+            up_file.replace_ts(last_ts)
+            down_file.replace_ts(last_ts)
+            last_ts += dt.timedelta(microseconds=1)
+            _file_ids.remove(up_file.file_id)
+
+    if _file_ids:
+        raise ValueError("Some migration ids were not found")
+
+    reorder_files(folder)

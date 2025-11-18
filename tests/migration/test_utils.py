@@ -13,7 +13,7 @@ def migration_folder(tmp_path):
     return tmp_path
 
 
-class TestReorderByMigrations:
+class TestReorderWithIds:
     @pytest.fixture()
     def setup_migration_folder(self, migration_folder):
         files = [
@@ -42,22 +42,52 @@ class TestReorderByMigrations:
                 else:
                     _prev_file_down = _file.name
 
-    _empty_folder = pytest.param(None, [], ["0000000", "0000001", "0000002", "0000003", "0000004"], id="empty folder")
+    _empty_folder_last_applied = pytest.param(
+        "last-applied", [], ["0000000", "0000001", "0000002", "0000003", "0000004"], id="empty folder - last applied"
+    )
 
-    _one_file_change = pytest.param(
-        None, ["0000002", "0000004"], ["0000000", "0000001", "0000004", "0000002", "0000003"], id="one file change"
+    _one_file_change_last_applied = pytest.param(
+        "last-applied",
+        ["0000002", "0000004"],
+        ["0000000", "0000001", "0000004", "0000002", "0000003"],
+        id="one file change - last applied",
+    )
+
+    _empty_folder_last = pytest.param(
+        "last", [], ["0000000", "0000001", "0000002", "0000003", "0000004"], id="empty folder - last"
+    )
+
+    _one_file_change_last = pytest.param(
+        "last", ["0000002"], ["0000000", "0000001", "0000003", "0000004", "0000002"], id="one file change - last"
+    )
+
+    _multiple_files_change_last = pytest.param(
+        "last",
+        ["0000002", "0000000"],
+        ["0000001", "0000003", "0000004", "0000000", "0000002"],
+        id="multiple files change - last",
     )
 
     @pytest.mark.usefixtures("setup_migration_folder")
-    @pytest.mark.parametrize("setup_fn, last_migration_ids, expected", [_empty_folder, _one_file_change])
-    def test_reorder(self, setup_fn, last_migration_ids, migration_folder, expected):
-        from padmy.migration import reorder_files_by_migrations, verify_migration_files
+    @pytest.mark.parametrize(
+        "mode, last_ids, expected",
+        [
+            _empty_folder_last_applied,
+            _one_file_change_last_applied,
+            _empty_folder_last,
+            _one_file_change_last,
+            _multiple_files_change_last,
+        ],
+    )
+    def test_reorder(self, mode, last_ids, migration_folder, expected):
+        from padmy.migration import reorder_files_by_applied_migrations, verify_migration_files, reorder_files_by_last
 
-        if setup_fn is not None:
-            setup_fn()
-
-        reorder_files_by_migrations(migration_folder, last_migration_ids=last_migration_ids)
-
+        if mode == "last-applied":
+            reorder_files_by_applied_migrations(migration_folder, last_applied_ids=last_ids)
+        elif mode == "last":
+            reorder_files_by_last(migration_folder, last_ids=last_ids)
+        else:
+            raise ValueError(f"Unknown mode {mode!r}")
         new_order = list([x.file_id for x in get_files(migration_folder, up_only=True)])
         assert new_order == expected
         assert not verify_migration_files(migration_folder)
