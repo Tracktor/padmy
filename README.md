@@ -4,14 +4,17 @@ CLI utility functions for Postgresql such as **sampling** and **anonymization**.
 
 ## Installation
 
-Run `poetry install`  to install the python packages.
+Just run
+```bash
+uv add padmy
+```
 
 ## 1. Database Exploration
 
 You can get information about a database by running
 
 ```bash
-poetry run cli analyze --db test --schemas test
+uvx padmy analyze --db test --schemas test
 ```
 
 or using the docker image
@@ -65,7 +68,7 @@ SELECT generate_series(0, 10);
 You can quickly sample (ie: take a subset) of a database by running
 
 ```bash
-poetry run cli sample \
+uvx padmy sample \
   --db test --to-db test-sampled \
   --sample 20 \
   --schemas public
@@ -102,7 +105,7 @@ This library includes a migration utility to help you evolve your data model.
 In order to use it, start by setting up the migration table:
 
 ```bash
-poetry run cli -vv migrate setup --db postgres
+uvx padmy -vv migrate setup --db postgres
 ```
 
 This will create the `public.migration` table that stores all the migration / rollback that
@@ -115,7 +118,7 @@ Now that we are all setup, let's create our first sql file that will create the 
 ```bash
 rm -rf /tmp/sql
 mkdir /tmp/sql
-poetry run cli -v migrate new-sql 1 --sql-dir /tmp/sql
+uvx padmy -v migrate new-sql 1 --sql-dir /tmp/sql
 tree /tmp/sql
 ```  
 
@@ -131,7 +134,7 @@ cat /tmp/sql/0001_new_file.sql
 Then apply the modifications to the database:
 
 ```bash
-poetry run cli -v migrate apply-sql --sql-dir /tmp/sql --db postgres 
+uvx padmy -v migrate apply-sql --sql-dir /tmp/sql --db postgres 
 ```
 
 > [!WARNING]
@@ -146,7 +149,7 @@ Now, lets create our first migration:
 migration_dir="/tmp/migrations"
 rm -rf "$migration_dir"
 mkdir "$migration_dir" # You can choose a different folder to store your migrations
-poetry run cli -v migrate new --sql-dir "$migration_dir" --author padmy
+uvx padmy -v migrate new --sql-dir "$migration_dir" --author padmy
 tree "$migration_dir"
 ```
 
@@ -198,7 +201,7 @@ SQL
 and check that the migration is valid:
 
 ```bash
-poetry run cli -v migrate verify --sql-dir /tmp/migrations --schemas general
+uvx padmy -v migrate verify --sql-dir /tmp/migrations --schemas general
 ``` 
 
 Because we did not add anything to the `down.sql` file, the command returns an error.
@@ -210,7 +213,7 @@ DROP table general.test2;
 ``` 
 
 ```bash
-poetry run cli -vv migrate verify --sql-dir /tmp/migrations
+uvx padmy -vv migrate verify --sql-dir /tmp/migrations
 ``` 
 
 We are all good !
@@ -218,7 +221,7 @@ We are all good !
 **Optional**: You can also verify that the order of the migration is correct by running:
 
 ```bash
-poetry run cli -vv migrate verify-files --sql-dir /tmp/migrations --no-raise
+uvx padmy -vv migrate verify-files --sql-dir /tmp/migrations --no-raise
 ```
 
 ## 4. Comparing databases schemas
@@ -226,7 +229,7 @@ poetry run cli -vv migrate verify-files --sql-dir /tmp/migrations --no-raise
 You can compare two databases by running:
 
 ```bash
-poetry run cli -vv schema-diff --db tracktor --schemas schema_1,schema_2
+uvx padmy -vv schema-diff --db tracktor --schemas schema_1,schema_2
 ```
 If differences are found, the command will output the differences between the two databases.
 
@@ -296,7 +299,7 @@ ALTER TABLE table2
 You can display cycling dependencies in a database by running:
 
 ```bash
-poetry run cli -vv analyze --db test --schemas test --show-graph
+uvx padmy -vv analyze --db test --schemas test --show-graph
 ```
 
 (**Note::** you'll need to have installed the `network` extra )
@@ -317,20 +320,29 @@ CREATE TABLE table1
 
 ## Showing Network in Jupyter
 
-You can display the network visualization in Jupyter using [jupyter_dash]()
+You can display the network visualization in Jupyter.
+
+Start by launching a JupyterLab session with:
+
+```bash
+uv run --group notebook jupyter lab
+```
+
+Then create a new notebook and run the following code:
 
 ```python
-from jupyter_dash import JupyterDash
+from dash import Dash
 from padmy.sampling import network, viz, sampling
+from padmy.utils import init_connection
 import asyncpg
 
 PG_URL = 'postgresql://postgres:postgres@localhost:5432/test'
 
-app = JupyterDash(__name__)
+app = Dash(__name__)
 
 db = sampling.Database(name='test')
 
-async with asyncpg.create_pool(PG_URL) as pool:
+async with asyncpg.create_pool(PG_URL, init=init_connection) as pool:
     await db.explore(pool, ['public'])
 
 g = network.convert_db(db)

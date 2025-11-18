@@ -2,13 +2,13 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
+from typing import Literal
 
 from asyncpg import Connection
-from piou import Option, Derived, CommandGroup, Password, CommandError
-
 from padmy.env import SQL_DIR, MIGRATION_DIR, CONSOLE
 from padmy.logs import logs
 from padmy.utils import get_pg, PgHost, PgPort, PgUser, PgDatabase, PgPassword
+from piou import Option, Derived, CommandGroup, Password, CommandError
 
 MIGRATION_DESCRIPTION = """
 Utilities to handle schema migrations with PostgresSQL.  
@@ -155,9 +155,13 @@ def reorder_files(
     output_dir: Path | None = Option(
         None, "--output-dir", "-o", help="Output directory", raise_path_does_not_exist=False
     ),
-    last_migration_ids: list[str] | None = Option(None, "--ids", "-l", help="Last migration ids (in descending order)"),
+    migration_ids: list[str] | None = Option(None, "--ids", "-l", help="Last migration ids (in descending order)"),
+    reorder_by: list[Literal["last-applied", "last"]] | None = Option(
+        None, "--by", help="Which method to use for the reorder (only useful if migration ids are speccified)"
+    ),
+    skip_verify: bool = Option(False, "--skip-verify", help="Skip verification after reordering"),
 ):
-    from .reorder import reorder_files, reorder_files_by_migrations
+    from .reorder import reorder_files, reorder_files_by_applied_migrations, reorder_files_by_last
     from .utils import verify_migration_files, MigrationFileError
 
     folder = migrations_dir
@@ -168,14 +172,19 @@ def reorder_files(
         shutil.copytree(migrations_dir, output_dir)
         folder = output_dir
 
-    if last_migration_ids:
-        reorder_files_by_migrations(folder, last_migration_ids=last_migration_ids)
-    else:
-        reorder_files(folder)
-    try:
-        verify_migration_files(folder)
-    except MigrationFileError as e:
-        raise CommandError(e.message)
+    match reorder_by:
+        case "last-applied":
+            reorder_files_by_applied_migrations(folder, last_applied_ids=migration_ids)
+        case "last":
+            reorder_files_by_last(folder, last_ids=migration_ids)
+        case _:
+            reorder_files(folder)
+
+    if not skip_verify:
+        try:
+            verify_migration_files(folder)
+        except MigrationFileError as e:
+            raise CommandError(e.message)
 
 
 @migration.command(cmd="verify-migrations", help="Verify that the migrations are applied correctly")

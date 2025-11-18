@@ -37,6 +37,10 @@ network = [
 bump = [
     "commitizen >=4.10.0,<5"
 ]
+notebook = [
+    "jupyterlab>=4.4.10",
+]
+
 
 
 [project.scripts]
