@@ -14,7 +14,7 @@ from padmy.db import pretty_print_stats, pprint_compared_dbs, Database
 from padmy.logs import setup_logging, logs
 from padmy.migration import migration
 from padmy.sampling import sample_database, copy_database
-from padmy.utils import get_pg_root, get_pg_root_from, init_connection
+from padmy.utils import get_pg_root, get_pg_root_from, init_connection, get_ssl_context, get_ssl_context_from
 from padmy.env import CONSOLE
 
 cli = Cli("Padmy utility commands")
@@ -35,7 +35,8 @@ cli.set_options_processor(on_process)
 async def get_explored_db(pg_url: str, db_name: str, schemas: list[str]):
     db = Database(name=db_name)
     logs.info(f"Gathering information about {db_name!r}...")
-    async with asyncpg.create_pool(f"{pg_url}/{db_name}", init=init_connection) as pool:
+    ssl_context = get_ssl_context()
+    async with asyncpg.create_pool(f"{pg_url}/{db_name}", init=init_connection, ssl=ssl_context) as pool:
         await db.explore(pool, schemas)
     return db
 
@@ -48,7 +49,8 @@ async def ano_main(
 ):
     config = Config.load_from_file(config_path)
     faker = Faker()
-    async with asyncpg.create_pool(f"{pg_url}/{db_name}") as pool:
+    ssl_context = get_ssl_context()
+    async with asyncpg.create_pool(f"{pg_url}/{db_name}", ssl=ssl_context) as pool:
         await anonymize_db(pool, config, faker)
 
 
@@ -94,8 +96,10 @@ async def sample_main(
             logs.info("Done!")
 
     # TODO clean if error
-    conn = await asyncpg.connect(f"{pg_from}/{from_db}", statement_cache_size=0)
-    target_conn = await asyncpg.connect(f"{pg_to}/{to_db}")
+    ssl_from = get_ssl_context_from("from")
+    ssl_to = get_ssl_context_from("to")
+    conn = await asyncpg.connect(f"{pg_from}/{from_db}", statement_cache_size=0, ssl=ssl_from)
+    target_conn = await asyncpg.connect(f"{pg_to}/{to_db}", ssl=ssl_to)
 
     db = await get_explored_db(pg_from, from_db, _schemas)
     db.load_config(config)

@@ -4,6 +4,7 @@ import asyncpg
 import json
 import os
 import re
+import ssl
 import subprocess
 import typing
 from contextlib import contextmanager
@@ -13,7 +14,7 @@ from typing import Sequence, AsyncIterator, Callable, TypeVar, cast, Literal
 from functools import partial
 
 from padmy import env
-from .env import PG_HOST, PG_PORT, PG_USER, PG_DATABASE, PG_PASSWORD
+from .env import PG_HOST, PG_PORT, PG_USER, PG_DATABASE, PG_PASSWORD, PG_SSL_MODE, PG_SSL_CA, PG_SSL_CERT, PG_SSL_KEY
 from .logs import logs
 
 PgHost = Option(PG_HOST, "--host", help="PG Host")
@@ -37,7 +38,8 @@ def get_pg_url(pg_url: str = Derived(get_pg_root), pg_database: str = PgDatabase
 
 
 async def get_pg(pg_url: str = Derived(get_pg_url)):
-    _conn = await asyncpg.connect(pg_url)
+    ssl_context = get_ssl_context()
+    _conn = await asyncpg.connect(pg_url, ssl=ssl_context)
     await init_connection(_conn)
     return _conn
 
@@ -90,6 +92,94 @@ def _get_check_cmd(cmd: str):
     if cmd not in _COMMANDS:
         check_cmd(cmd)
     return _COMMANDS[cmd]
+
+
+def create_ssl_context(
+    ssl_mode: str | None = None,
+    ssl_ca: str | None = None,
+    ssl_cert: str | None = None,
+    ssl_key: str | None = None,
+) -> ssl.SSLContext | None:
+    """
+    Creates an SSL context for PostgreSQL connections with mTLS support.
+
+    Args:
+        ssl_mode: SSL mode - "require", "verify-ca", or "verify-full"
+        ssl_ca: Path to CA certificate file
+        ssl_cert: Path to client certificate file
+        ssl_key: Path to client private key file
+
+    Returns:
+        SSLContext configured for mTLS, or None if SSL is not configured
+    """
+    # If no SSL configuration is provided, return None (no SSL)
+    if not ssl_mode and not ssl_ca and not ssl_cert and not ssl_key:
+        return None
+
+    # Create SSL context
+    ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+
+    # Load CA certificate if provided
+    if ssl_ca:
+        ca_path = Path(ssl_ca)
+        if not ca_path.exists():
+            raise FileNotFoundError(f"CA certificate not found: {ssl_ca}")
+        logs.debug(f"Loading CA certificate from {ssl_ca}")
+        ctx.load_verify_locations(cafile=ssl_ca)
+
+    # Load client certificate and key for mTLS if provided
+    if ssl_cert and ssl_key:
+        cert_path = Path(ssl_cert)
+        key_path = Path(ssl_key)
+        if not cert_path.exists():
+            raise FileNotFoundError(f"Client certificate not found: {ssl_cert}")
+        if not key_path.exists():
+            raise FileNotFoundError(f"Client key not found: {ssl_key}")
+        logs.debug(f"Loading client certificate from {ssl_cert} and key from {ssl_key}")
+        ctx.load_cert_chain(certfile=ssl_cert, keyfile=ssl_key)
+    elif ssl_cert or ssl_key:
+        raise ValueError("Both ssl_cert and ssl_key must be provided together for mTLS")
+
+    # Configure SSL verification mode
+    if ssl_mode == "require":
+        # Require SSL but don't verify the server certificate
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        logs.debug("SSL mode: require (no certificate verification)")
+    elif ssl_mode == "verify-ca":
+        # Verify server certificate against CA
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_REQUIRED
+        logs.debug("SSL mode: verify-ca (verify certificate authority)")
+    elif ssl_mode == "verify-full":
+        # Verify server certificate and hostname
+        ctx.check_hostname = True
+        ctx.verify_mode = ssl.CERT_REQUIRED
+        logs.debug("SSL mode: verify-full (verify certificate and hostname)")
+    elif ssl_mode:
+        raise ValueError(f"Invalid SSL mode: {ssl_mode}. Use 'require', 'verify-ca', or 'verify-full'")
+    else:
+        # Default to verify-full if SSL is configured but mode is not specified
+        ctx.check_hostname = True
+        ctx.verify_mode = ssl.CERT_REQUIRED
+        logs.debug("SSL mode: verify-full (default)")
+
+    return ctx
+
+
+def get_ssl_context() -> ssl.SSLContext | None:
+    """
+    Creates an SSL context from environment variables.
+
+    Returns:
+        SSLContext configured from environment variables, or None if SSL is not configured
+    """
+    return create_ssl_context(
+        ssl_mode=PG_SSL_MODE,
+        ssl_ca=PG_SSL_CA,
+        ssl_cert=PG_SSL_CERT,
+        ssl_key=PG_SSL_KEY,
+    )
 
 
 def get_pg_envs():
@@ -315,6 +405,25 @@ def get_first(*it: X, fn: Callable) -> X | None:
 async def get_conn(pool: asyncpg.Pool, fn: Callable):
     async with pool.acquire() as conn:
         await fn(conn=conn)
+
+
+def get_ssl_context_from(source: Literal["from", "to"]) -> ssl.SSLContext | None:
+    """
+    Creates an SSL context from environment variables for "from" or "to" connections.
+
+    Args:
+        source: Either "from" or "to" to specify which set of environment variables to use
+
+    Returns:
+        SSLContext configured for mTLS, or None if SSL is not configured
+    """
+    _source = source.upper()
+    return create_ssl_context(
+        ssl_mode=os.getenv(f"PG_SSL_MODE_{_source}"),
+        ssl_ca=os.getenv(f"PG_SSL_CA_{_source}"),
+        ssl_cert=os.getenv(f"PG_SSL_CERT_{_source}"),
+        ssl_key=os.getenv(f"PG_SSL_KEY_{_source}"),
+    )
 
 
 def get_pg_root_from(source: Literal["from", "to"]):
