@@ -4,11 +4,11 @@ import tempfile
 from pathlib import Path
 from typing import Literal
 
-from asyncpg import Connection
+from piou import Option, Derived, CommandGroup, Password, CommandError
+
 from padmy.env import SQL_DIR, MIGRATION_DIR, CONSOLE
 from padmy.logs import logs
-from padmy.utils import get_pg, PgHost, PgPort, PgUser, PgDatabase, PgPassword
-from piou import Option, Derived, CommandGroup, Password, CommandError
+from padmy.utils import get_pg_infos, PgHost, PgPort, PgUser, PgDatabase, PgPassword, PGConnectionInfo
 
 MIGRATION_DESCRIPTION = """
 Utilities to handle schema migrations with PostgresSQL.  
@@ -38,7 +38,7 @@ def new_sql_file(
 
 @migration.command(cmd="apply-sql")
 async def apply_sql_files(
-    pg_conn: Connection = Derived(get_pg),
+    pg_conn: PGConnectionInfo = Derived(get_pg_infos),
     sql_dir: Path = SQLDir,
 ):
     """
@@ -46,9 +46,10 @@ async def apply_sql_files(
     """
     from ..utils import exec_file
 
-    for file in sorted(sql_dir.glob("*.sql")):
-        logs.info(f"Applying {file.name!r}")
-        await exec_file(pg_conn, file)
+    async with pg_conn.get_conn() as conn:
+        for file in sorted(sql_dir.glob("*.sql")):
+            logs.info(f"Applying {file.name!r}")
+            await exec_file(conn, file)
 
 
 @migration.command(cmd="new", help="Creates 2 new files for a migration (up and down)")
@@ -71,38 +72,41 @@ def new_migrate_file(
 
 @migration.command(cmd="up", help="Migrate database to the new schema")
 async def migrate_up_main(
-    pg_conn: Connection = Derived(get_pg),
+    pg_infos: PGConnectionInfo = Derived(get_pg_infos),
     sql_dir: Path = MigrationDir,
     nb_migrations: int = Option(1, "-n", "--nb-migrations", help="Number of migrations to apply"),
 ):
     from .migration import migrate_up, NoSetupTableError
 
-    try:
-        await migrate_up(pg_conn, folder=sql_dir, nb_migrations=nb_migrations)
-    except NoSetupTableError as e:
-        logs.critical(e, exc_info=False)
+    async with pg_infos.get_conn() as conn:
+        try:
+            await migrate_up(conn, folder=sql_dir, nb_migrations=nb_migrations)
+        except NoSetupTableError as e:
+            logs.critical(e, exc_info=False)
 
 
 @migration.command(cmd="down", help="Rollback the database to the specified migration")
 async def migrate_down_main(
-    conn: Connection = Derived(get_pg),
+    pg_infos: PGConnectionInfo = Derived(get_pg_infos),
     sql_dir: Path = MigrationDir,
     nb_rollbacks: int | None = Option(None, "-n", "--nb-rollbacks", help="Number of rollbacks to apply"),
     migration_id: str | None = Option(None, "-m", "--migration-id", help="Migration id to rollback to"),
 ):
     from .migration import migrate_down, NoSetupTableError
 
-    try:
-        await migrate_down(conn, folder=sql_dir, migration_id=migration_id, nb_migrations=nb_rollbacks)
-    except NoSetupTableError as e:
-        logs.critical(e, exc_info=False)
+    async with pg_infos.get_conn() as conn:
+        try:
+            await migrate_down(conn, folder=sql_dir, migration_id=migration_id, nb_migrations=nb_rollbacks)
+        except NoSetupTableError as e:
+            logs.critical(e, exc_info=False)
 
 
 @migration.command(cmd="setup", help="Create the tables that will contain the migration metadata")
-async def migrate_setup_main(pg_conn: Connection = Derived(get_pg)):
+async def migrate_setup_main(pg_infos: PGConnectionInfo = Derived(get_pg_infos)):
     from .migration import migrate_setup
 
-    await migrate_setup(pg_conn)
+    async with pg_infos.get_conn() as conn:
+        await migrate_setup(conn)
 
 
 @migration.command(cmd="verify", help="Verify that a migration is valid")
@@ -189,9 +193,10 @@ def reorder_files(
 
 @migration.command(cmd="verify-migrations", help="Verify that the migrations are applied correctly")
 async def verify_migrations(
-    pg_conn: Connection = Derived(get_pg),
+    pg_infos: PGConnectionInfo = Derived(get_pg_infos),
     migrations_dir: Path = MigrationDir,
 ):
     from .migration import verify_migrations
 
-    await verify_migrations(pg_conn, migrations_dir)
+    async with pg_infos.get_conn() as conn:
+        await verify_migrations(conn, migrations_dir)

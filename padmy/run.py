@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import ssl
 import sys
 import tempfile
 from pathlib import Path
@@ -14,7 +15,7 @@ from padmy.db import pretty_print_stats, pprint_compared_dbs, Database
 from padmy.logs import setup_logging, logs
 from padmy.migration import migration
 from padmy.sampling import sample_database, copy_database
-from padmy.utils import get_pg_root, get_pg_root_from, init_connection, get_ssl_context, get_ssl_context_from
+from padmy.utils import get_pg_infos, get_pg_infos_from, init_connection, PGConnectionInfo
 from padmy.env import CONSOLE
 
 cli = Cli("Padmy utility commands")
@@ -32,25 +33,25 @@ def on_process(verbose: bool = False, verbose2: bool = False):
 cli.set_options_processor(on_process)
 
 
-async def get_explored_db(pg_url: str, db_name: str, schemas: list[str]):
+async def get_explored_db(
+    pg_url: str, db_name: str, schemas: list[str], ssl_context: ssl.SSLContext | None = None
+) -> Database:
     db = Database(name=db_name)
     logs.info(f"Gathering information about {db_name!r}...")
-    ssl_context = get_ssl_context()
-    async with asyncpg.create_pool(f"{pg_url}/{db_name}", init=init_connection, ssl=ssl_context) as pool:
+    async with asyncpg.create_pool(pg_url, init=init_connection, ssl=ssl_context) as pool:
         await db.explore(pool, schemas)
     return db
 
 
 @cli.command(cmd="anonymize", help="Run anonymization")
 async def ano_main(
-    pg_url: str = Derived(get_pg_root),
+    pg_infos: PGConnectionInfo = Derived(get_pg_infos),
     db_name: str = Option(..., "--db", help="Database to anonymize"),
     config_path: Path = Option(..., "-f", "--file", help="Path to the configuration file"),
 ):
     config = Config.load_from_file(config_path)
     faker = Faker()
-    ssl_context = get_ssl_context()
-    async with asyncpg.create_pool(f"{pg_url}/{db_name}", ssl=ssl_context) as pool:
+    async with pg_infos.get_pool(db_name) as pool:
         await anonymize_db(pool, config, faker)
 
 
@@ -62,9 +63,8 @@ async def sample_main(
     sample: int | None = Option(None, "--sample", help="Sample size"),
     config_path: Path | None = Option(None, "-f", "--file", help="Path to the configuration file"),
     copy_db: bool = Option(False, "--copy-db", help="Copy database before sampling"),
-    # pg_url: str = Derived(get_pg_root),
-    pg_from: str = Derived(get_pg_root_from("from")),
-    pg_to: str = Derived(get_pg_root_from("to")),
+    pg_from_info: PGConnectionInfo = Derived(get_pg_infos_from("from")),
+    pg_to_info: PGConnectionInfo = Derived(get_pg_infos_from("to")),
     progress: bool = Option(False, "--progress", help="Show sampling progress"),
 ):
     """
@@ -83,8 +83,8 @@ async def sample_main(
         logs.info(f"Copying {from_db!r} to {to_db!r}")
         try:
             copy_database(
-                from_pg_uri=pg_from,
-                to_pg_uri=pg_to,
+                from_pg_uri=pg_from_info,
+                to_pg_uri=pg_to_info,
                 from_db=from_db,
                 to_db=to_db,
                 schemas=_schemas,
@@ -95,26 +95,20 @@ async def sample_main(
         else:
             logs.info("Done!")
 
-    # TODO clean if error
-    ssl_from = get_ssl_context_from("from")
-    ssl_to = get_ssl_context_from("to")
-    conn = await asyncpg.connect(f"{pg_from}/{from_db}", statement_cache_size=0, ssl=ssl_from)
-    target_conn = await asyncpg.connect(f"{pg_to}/{to_db}", ssl=ssl_to)
-
-    db = await get_explored_db(pg_from, from_db, _schemas)
+    db = await get_explored_db(pg_from_info.pg_url, from_db, _schemas, ssl_context=pg_from_info.ssl_context)
     db.load_config(config)
 
     pretty_print_stats(db)
 
-    try:
-        await sample_database(conn, target_conn, db, show_progress=progress)
-    except Exception as e:
-        raise e
-    finally:
-        await asyncio.wait_for(conn.close(), timeout=1)
-        await asyncio.wait_for(target_conn.close(), timeout=1)
+    # Set database names for connections
+    pg_from_info.database = from_db
+    pg_to_info.database = to_db
 
-    new_db = await get_explored_db(pg_to, to_db, _schemas)
+    async with pg_from_info.get_conn() as conn:
+        async with pg_to_info.get_conn() as target_conn:
+            await sample_database(conn, target_conn, db, show_progress=progress)
+
+    new_db = await get_explored_db(pg_to_info.pg_url, to_db, _schemas, ssl_context=pg_to_info.ssl_context)
 
     pprint_compared_dbs(db, new_db)
 
@@ -124,15 +118,15 @@ def copy_main(
     from_db: str = Option(..., "--db", help="Database to migrate from"),
     to_db: str = Option(..., "--db-to", help="Database to migrate to"),
     schemas: list[str] = Option(..., "--schemas", help="Schemas to samples"),
-    pg_from: str = Derived(get_pg_root_from("from")),
-    pg_to: str = Derived(get_pg_root_from("to")),
+    pg_from_info: PGConnectionInfo = Derived(get_pg_infos_from("from")),
+    pg_to_info: PGConnectionInfo = Derived(get_pg_infos_from("to")),
 ):
     from padmy.sampling import copy_database
 
     logs.info(f"Copying {from_db!r} to {to_db!r}")
     copy_database(
-        from_pg_uri=pg_from,
-        to_pg_uri=pg_to,
+        from_pg_uri=pg_from_info,
+        to_pg_uri=pg_to_info,
         from_db=from_db,
         to_db=to_db,
         schemas=schemas,
@@ -144,7 +138,7 @@ def copy_main(
 @cli.command(cmd="analyze", help="Analyze database")
 async def analyze_main(
     db_name: str = Option(..., "--db", help="Database to explore"),
-    pg_url: str = Derived(get_pg_root),
+    pg_infos: PGConnectionInfo = Derived(get_pg_infos),
     schemas: list[str] = Option(..., "--schemas", help="Schemas to analyze"),
     show_graphs: bool = Option(False, "--show-graphs", help="Show graphs of the database"),
     port: int = Option(5555, "--graph-port", help="Port for the graph"),
@@ -154,7 +148,9 @@ async def analyze_main(
     """
     from padmy.db import pretty_print_stats
 
-    db = await get_explored_db(pg_url, db_name, schemas)
+    pg_infos.database = db_name
+
+    db = await get_explored_db(pg_infos.dsn, db_name, schemas)
 
     if not show_graphs:
         pretty_print_stats(db)
@@ -169,14 +165,14 @@ async def analyze_main(
 async def compare_db_main(
     from_db: str = Option(..., "--db", help="Database to explore"),
     to_db: str = Option(..., "--db-to", help="Database to explore"),
-    pg_url: str = Derived(get_pg_root),
+    pg_url: PGConnectionInfo = Derived(get_pg_infos),
     schemas: list[str] = Option(..., "--schemas", help="Schemas to analyze"),
 ):
     from padmy.db import pprint_compared_dbs
 
     db1, db2 = await asyncio.gather(
-        get_explored_db(pg_url, from_db, schemas),
-        get_explored_db(pg_url, to_db, schemas),
+        get_explored_db(pg_url.pg_url, from_db, schemas, ssl_context=pg_url.ssl_context),
+        get_explored_db(pg_url.pg_url, to_db, schemas, ssl_context=pg_url.ssl_context),
     )
 
     pprint_compared_dbs(db1, db2)
@@ -184,8 +180,8 @@ async def compare_db_main(
 
 @cli.command(cmd="schema-diff", help="Compare the schemas of 2 databases")
 def schema_diff(
-    pg_from: str = Derived(get_pg_root_from("from")),
-    pg_to: str = Derived(get_pg_root_from("to")),
+    pg_from_info: PGConnectionInfo = Derived(get_pg_infos_from("from")),
+    pg_to_info: PGConnectionInfo = Derived(get_pg_infos_from("to")),
     database: str = Option(..., "--db", help="Database to compare"),
     schemas: list[str] = Option(..., "--schemas", help="Schemas to analyze"),
     no_privileges: bool = Option(False, "-x", "--no-privileges", help="Exclude privileges from the dump"),
@@ -195,8 +191,8 @@ def schema_diff(
     with tempfile.TemporaryDirectory() as dump_dir:
         _dump_dir = Path(dump_dir)
         diff = compare_databases(
-            pg_from,
-            to_pg_url=pg_to,
+            from_pg_url=pg_from_info,
+            to_pg_url=pg_to_info,
             schemas=schemas,
             database=database,
             dump_dir=_dump_dir,

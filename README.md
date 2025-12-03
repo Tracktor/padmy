@@ -342,8 +342,6 @@ app = Dash(__name__)
 
 db = sampling.Database(name='test')
 
-# For SSL/mTLS connections, use get_ssl_context() which reads from environment variables
-ssl_context = get_ssl_context()
 async with asyncpg.create_pool(PG_URL, init=init_connection, ssl=ssl_context) as pool:
     await db.explore(pool, ['public'])
 
@@ -354,50 +352,4 @@ app.layout = viz.get_layout(g,
                             layout='klay')
 
 app.run_server(mode='jupyterlab')  # or mode='inline'
-```
-
-## SSL/TLS and mTLS Configuration
-
-Padmy supports SSL/TLS and mutual TLS (mTLS) for secure PostgreSQL connections. Configure SSL by setting the following environment variables:
-
-### Basic SSL Configuration
-
-```bash
-export PG_SSL_MODE="verify-full"        # Options: "require", "verify-ca", "verify-full"
-export PG_SSL_CA="/path/to/ca.crt"     # Path to CA certificate
-```
-
-### mTLS Configuration (Client Certificate Authentication)
-
-For mutual TLS authentication, also provide client certificates:
-
-```bash
-export PG_SSL_MODE="verify-full"
-export PG_SSL_CA="/path/to/ca.crt"
-export PG_SSL_CERT="/path/to/client.crt"
-export PG_SSL_KEY="/path/to/client.key"
-```
-
-### SSL Modes
-
-- **`require`**: Require SSL connection but don't verify the server certificate
-- **`verify-ca`**: Require SSL and verify the server certificate against the CA
-- **`verify-full`**: Require SSL, verify the server certificate and hostname (recommended)
-
-### Source-Specific SSL Configuration
-
-For commands that work with two databases (like `sample` or `schema-diff`), you can configure SSL separately for each connection:
-
-```bash
-# For the source ("from") database
-export PG_SSL_MODE_FROM="verify-full"
-export PG_SSL_CA_FROM="/path/to/from-ca.crt"
-export PG_SSL_CERT_FROM="/path/to/from-client.crt"
-export PG_SSL_KEY_FROM="/path/to/from-client.key"
-
-# For the target ("to") database
-export PG_SSL_MODE_TO="verify-full"
-export PG_SSL_CA_TO="/path/to/to-ca.crt"
-export PG_SSL_CERT_TO="/path/to/to-client.crt"
-export PG_SSL_KEY_TO="/path/to/to-client.key"
 ```

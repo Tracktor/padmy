@@ -1,17 +1,18 @@
-from importlib import reload
-
-import asyncpg
+import contextlib
 import json
 import os
 import re
 import ssl
 import subprocess
-import typing
 from contextlib import contextmanager
-from pathlib import Path
-from piou import Option, Derived, Password
-from typing import Sequence, AsyncIterator, Callable, TypeVar, cast, Literal
+from dataclasses import dataclass
 from functools import partial
+from importlib import reload
+from pathlib import Path
+from typing import Sequence, AsyncIterator, Callable, TypeVar, cast, Literal
+
+import asyncpg
+from piou import Option, Password
 
 from padmy import env
 from .env import PG_HOST, PG_PORT, PG_USER, PG_DATABASE, PG_PASSWORD, PG_SSL_MODE, PG_SSL_CA, PG_SSL_CERT, PG_SSL_KEY
@@ -22,27 +23,6 @@ PgPort = Option(PG_PORT, "--port", help="PG Port")
 PgUser = Option(PG_USER, "--user", help="PG User")
 PgPassword = Option(PG_PASSWORD, "-p", help="PG Password")
 PgDatabase = Option(PG_DATABASE, "--db", help="PG Database")
-
-
-def get_pg_root(
-    pg_host: str = Option(PG_HOST, "--host", help="PG Host"),
-    pg_port: int = Option(PG_PORT, "--port", help="PG Port"),
-    pg_user: str = Option(PG_USER, "--user", help="PG User"),
-    pg_password: Password = Option(PG_PASSWORD, "-p", help="PG Password"),
-):
-    return f"postgresql://{pg_user}:{pg_password}@{pg_host}:{pg_port}"
-
-
-def get_pg_url(pg_url: str = Derived(get_pg_root), pg_database: str = PgDatabase):
-    return f"{pg_url}/{pg_database}"
-
-
-async def get_pg(pg_url: str = Derived(get_pg_url)):
-    ssl_context = get_ssl_context()
-    _conn = await asyncpg.connect(pg_url, ssl=ssl_context)
-    await init_connection(_conn)
-    return _conn
-
 
 OnStdErrorFn = Callable[[str], None]
 
@@ -96,9 +76,9 @@ def _get_check_cmd(cmd: str):
 
 def create_ssl_context(
     ssl_mode: str | None = None,
-    ssl_ca: str | None = None,
-    ssl_cert: str | None = None,
-    ssl_key: str | None = None,
+    ssl_ca: Path | None = None,
+    ssl_cert: Path | None = None,
+    ssl_key: Path | None = None,
 ) -> ssl.SSLContext | None:
     """
     Creates an SSL context for PostgreSQL connections with mTLS support.
@@ -121,19 +101,18 @@ def create_ssl_context(
 
     # Load CA certificate if provided
     if ssl_ca:
-        ca_path = Path(ssl_ca)
-        if not ca_path.exists():
-            raise FileNotFoundError(f"CA certificate not found: {ssl_ca}")
-        logs.debug(f"Loading CA certificate from {ssl_ca}")
+        if not ssl_ca.exists():
+            raise FileNotFoundError(f"CA certificate not found: {ssl_ca!r}")
+        logs.debug(f"Loading CA certificate from {ssl_ca!r}")
         ctx.load_verify_locations(cafile=ssl_ca)
 
     # Load client certificate and key for mTLS if provided
     if ssl_cert and ssl_key:
-        cert_path = Path(ssl_cert)
-        key_path = Path(ssl_key)
-        if not cert_path.exists():
+        # cert_path = Path(ssl_cert)
+        # key_path = Path(ssl_key)
+        if not ssl_cert.exists():
             raise FileNotFoundError(f"Client certificate not found: {ssl_cert}")
-        if not key_path.exists():
+        if not ssl_key.exists():
             raise FileNotFoundError(f"Client key not found: {ssl_key}")
         logs.debug(f"Loading client certificate from {ssl_cert} and key from {ssl_key}")
         ctx.load_cert_chain(certfile=ssl_cert, keyfile=ssl_key)
@@ -167,29 +146,39 @@ def create_ssl_context(
     return ctx
 
 
-def get_ssl_context() -> ssl.SSLContext | None:
-    """
-    Creates an SSL context from environment variables.
-
-    Returns:
-        SSLContext configured from environment variables, or None if SSL is not configured
-    """
-    return create_ssl_context(
-        ssl_mode=PG_SSL_MODE,
-        ssl_ca=PG_SSL_CA,
-        ssl_cert=PG_SSL_CERT,
-        ssl_key=PG_SSL_KEY,
-    )
+# def get_ssl_context() -> ssl.SSLContext | None:
+#     """
+#     Creates an SSL context from environment variables.
+#
+#     Returns:
+#         SSLContext configured from environment variables, or None if SSL is not configured
+#     """
+#     return create_ssl_context(
+#         ssl_mode=PG_SSL_MODE,
+#         ssl_ca=PG_SSL_CA,
+#         ssl_cert=PG_SSL_CERT,
+#         ssl_key=PG_SSL_KEY,
+#     )
 
 
 def get_pg_envs():
     reload(env)
-    return {
+    envs = {
         "PGPASSWORD": env.PG_PASSWORD,
         "PGUSER": env.PG_USER,
         "PGHOST": env.PG_HOST,
         "PGPORT": str(env.PG_PORT),
     }
+    # Add SSL environment variables if configured
+    if PG_SSL_MODE:
+        envs["PGSSLMODE"] = PG_SSL_MODE
+    if PG_SSL_CA:
+        envs["PGSSLROOTCERT"] = PG_SSL_CA
+    if PG_SSL_CERT:
+        envs["PGSSLCERT"] = PG_SSL_CERT
+    if PG_SSL_KEY:
+        envs["PGSSLKEY"] = PG_SSL_KEY
+    return envs
 
 
 class PGError(Exception):
@@ -362,10 +351,10 @@ async def iterate_pg(
 
 
 _EXT_EXISTS_QUERY = """
-SELECT EXISTS(
-    SELECT FROM pg_extension WHERE extname = $1
-)
-"""
+                    SELECT EXISTS(SELECT
+                                  FROM pg_extension
+                                  WHERE extname = $1) \
+                    """
 
 
 async def check_extension_exists(conn: asyncpg.Connection, extension: str) -> bool:
@@ -376,13 +365,11 @@ async def check_extension_exists(conn: asyncpg.Connection, extension: str) -> bo
 
 
 _TMP_TABLE_EXISTS_QUERY = """
-    SELECT EXISTS (
-        SELECT 
-        FROM   information_schema.tables 
-        WHERE  table_schema LIKE 'pg_temp_%'
-        AND table_name = $1
-    )
-"""
+                          SELECT EXISTS (SELECT
+                                         FROM information_schema.tables
+                                         WHERE table_schema LIKE 'pg_temp_%'
+                                           AND table_name = $1) \
+                          """
 
 
 async def check_tmp_table_exists(conn: asyncpg.Connection, table: str) -> bool:
@@ -407,26 +394,246 @@ async def get_conn(pool: asyncpg.Pool, fn: Callable):
         await fn(conn=conn)
 
 
-def get_ssl_context_from(source: Literal["from", "to"]) -> ssl.SSLContext | None:
+@dataclass
+class PGConnectionInfo:
+    """Connection information for PostgreSQL including DSN and SSL context."""
+
+    pg_user: str
+    pg_password: str
+    pg_host: str
+    pg_port: int
+    ssl_mode: str | None = None
+    ssl_ca: Path | None = None
+    ssl_cert: Path | None = None
+    ssl_key: Path | None = None
+    database: str | None = None
+
+    @classmethod
+    def from_uri(cls, uri: str) -> "PGConnectionInfo":
+        """
+        Parse a PostgreSQL URI and create a PGConnectionInfo instance.
+
+        Supports URIs in the format:
+        postgresql://user:password@host:port/dbname?sslmode=...&sslrootcert=...&sslcert=...&sslkey=...
+
+        Args:
+            uri: PostgreSQL connection URI
+
+        Returns:
+            PGConnectionInfo instance
+
+        Raises:
+            ValueError: If the URI format is invalid
+        """
+        import re
+        from urllib.parse import parse_qs
+
+        pattern = re.compile(
+            r"postgresql://(?P<user>[^:]+):(?P<password>[^@]+)@(?P<host>[^:]+):(?P<port>\d+)"
+            r"(/(?P<dbname>[^?]+))?(\?(?P<params>.+))?"
+        )
+
+        if match := pattern.match(uri):
+            group = match.groupdict()
+
+            # Parse query parameters for SSL settings
+            ssl_mode = None
+            ssl_ca = None
+            ssl_cert = None
+            ssl_key = None
+
+            if params_str := group.get("params"):
+                params = parse_qs(params_str)
+                ssl_mode = params.get("sslmode", [None])[0]
+                ssl_ca = params.get("sslrootcert", [None])[0]
+                ssl_cert = params.get("sslcert", [None])[0]
+                ssl_key = params.get("sslkey", [None])[0]
+
+            return cls(
+                pg_user=group["user"],
+                pg_password=group["password"],
+                pg_host=group["host"],
+                pg_port=int(group["port"]),
+                database=group["dbname"],
+                ssl_mode=ssl_mode,
+                ssl_ca=Path(ssl_ca) if ssl_ca else None,
+                ssl_cert=Path(ssl_cert) if ssl_cert else None,
+                ssl_key=Path(ssl_key) if ssl_key else None,
+            )
+        raise ValueError(f"Invalid PG uri: {uri}")
+
+    @property
+    def dsn(self) -> str:
+        return f"postgresql://{self.pg_user}:{self.pg_password}@{self.pg_host}:{self.pg_port}"
+
+    @property
+    def obfuscated_dsn(self) -> str:
+        return f"postgresql://{self.pg_user}:****@{self.pg_host}:{self.pg_port}"
+
+    @property
+    def ssl_context(self) -> ssl.SSLContext | None:
+        ssl_context = create_ssl_context(
+            ssl_mode=self.ssl_mode,
+            ssl_ca=self.ssl_ca,
+            ssl_cert=self.ssl_cert,
+            ssl_key=self.ssl_key,
+        )
+        return ssl_context
+
+    def get_env_vars(self) -> dict[str, str]:
+        """Get environment variables for CLI tools based on SSL context."""
+        envs = {}
+        if self.ssl_mode:
+            envs["PGSSLMODE"] = self.ssl_mode
+        if self.ssl_ca:
+            envs["PGSSLROOTCERT"] = str(self.ssl_ca)
+        if self.ssl_cert:
+            envs["PGSSLCERT"] = str(self.ssl_cert)
+        if self.ssl_key:
+            envs["PGSSLKEY"] = str(self.ssl_key)
+        return envs
+
+    @property
+    def pg_url(self) -> str:
+        """Returns the PostgreSQL connection URL with SSL parameters appended."""
+        if not self.ssl_mode and not self.ssl_ca and not self.ssl_cert and not self.ssl_key:
+            return self.dsn
+
+        # Build SSL query parameters for asyncpg DSN format
+        ssl_params = []
+        if self.ssl_mode:
+            ssl_params.append(f"sslmode={self.ssl_mode}")
+        if self.ssl_ca:
+            ssl_params.append(f"sslrootcert={self.ssl_ca}")
+        if self.ssl_cert:
+            ssl_params.append(f"sslcert={self.ssl_cert}")
+        if self.ssl_key:
+            ssl_params.append(f"sslkey={self.ssl_key}")
+
+        # Append parameters to URI
+        separator = "&" if "?" in self.dsn else "?"
+        return f"{self.dsn}{separator}{'&'.join(ssl_params)}"
+
+    @contextmanager
+    def temp_env(self, *, include_database: bool = True):
+        """
+        Context manager that sets PostgreSQL environment variables.
+
+        Args:
+            include_database: Whether to include PGDATABASE in the environment variables
+        """
+        _env = {
+            "PGHOST": self.pg_host,
+            "PGPORT": str(self.pg_port),
+            "PGUSER": self.pg_user,
+            "PGPASSWORD": self.pg_password,
+        }
+
+        if include_database and self.database:
+            _env["PGDATABASE"] = self.database
+
+        # Add SSL environment variables
+        _env.update(self.get_env_vars())
+
+        # Save current environment
+        old_env = os.environ.copy()
+        os.environ.update(_env)
+        try:
+            yield
+        finally:
+            # Restore original environment
+            os.environ.clear()
+            os.environ.update(old_env)
+
+    @contextlib.asynccontextmanager
+    async def get_conn(self):
+        conn = await asyncpg.connect(dsn=self.pg_url, ssl=self.ssl_context)
+        try:
+            yield conn
+        finally:
+            await conn.close()
+
+    @contextlib.asynccontextmanager
+    async def get_pool(self, database: str | None = None) -> AsyncIterator[asyncpg.Pool]:
+        if database is not None:
+            _database = database
+        else:
+            _database = self.database
+        if _database is None:
+            raise ValueError("Either database parameter or PGConnectionInfo.database must be set")
+        dsn = f"{self.dsn}/{_database}"
+        async with asyncpg.create_pool(dsn=dsn, ssl=self.ssl_context) as pool:
+            yield pool
+
+
+def get_pg_infos(
+    pg_host: str = PgHost,
+    pg_port: int = PgPort,
+    pg_user: str = PgUser,
+    pg_password: str = PgPassword,
+    ssl_mode: str | None = Option(
+        PG_SSL_MODE,
+        "--ssl-mode",
+        help="SSL mode for (require, verify-ca, verify-full)",
+    ),
+    ssl_ca: Path | None = Option(
+        PG_SSL_CA,
+        "--ssl-ca",
+        help="Path to CA certificate",
+    ),
+    ssl_cert: Path | None = Option(
+        PG_SSL_CERT,
+        "--ssl-cert",
+        help="Path to client certificate",
+    ),
+    ssl_key: Path | None = Option(
+        PG_SSL_KEY,
+        "--ssl-key",
+        help="Path to client private key",
+    ),
+) -> PGConnectionInfo:
+    return PGConnectionInfo(
+        pg_user=pg_user,
+        pg_password=pg_password,
+        pg_host=pg_host,
+        pg_port=pg_port,
+        ssl_ca=ssl_ca,
+        ssl_cert=ssl_cert,
+        ssl_key=ssl_key,
+        ssl_mode=ssl_mode,
+    )
+
+
+# def get_pg_url(pg_url: str = Derived(get_pg_root), pg_database: str = PgDatabase):
+#     return f"{pg_url}/{pg_database}"
+
+
+def get_ssl_envs_from(source: Literal["from", "to"]) -> dict[str, str]:
     """
-    Creates an SSL context from environment variables for "from" or "to" connections.
+    Gets SSL environment variables for "from" or "to" connections.
 
     Args:
         source: Either "from" or "to" to specify which set of environment variables to use
 
     Returns:
-        SSLContext configured for mTLS, or None if SSL is not configured
+        Dictionary of SSL environment variables for PostgreSQL CLI tools
     """
     _source = source.upper()
-    return create_ssl_context(
-        ssl_mode=os.getenv(f"PG_SSL_MODE_{_source}"),
-        ssl_ca=os.getenv(f"PG_SSL_CA_{_source}"),
-        ssl_cert=os.getenv(f"PG_SSL_CERT_{_source}"),
-        ssl_key=os.getenv(f"PG_SSL_KEY_{_source}"),
-    )
+    envs = {}
+
+    if ssl_mode := os.getenv(f"PG_SSL_MODE_{_source}"):
+        envs["PGSSLMODE"] = ssl_mode
+    if ssl_ca := os.getenv(f"PG_SSL_CA_{_source}"):
+        envs["PGSSLROOTCERT"] = ssl_ca
+    if ssl_cert := os.getenv(f"PG_SSL_CERT_{_source}"):
+        envs["PGSSLCERT"] = ssl_cert
+    if ssl_key := os.getenv(f"PG_SSL_KEY_{_source}"):
+        envs["PGSSLKEY"] = ssl_key
+
+    return envs
 
 
-def get_pg_root_from(source: Literal["from", "to"]):
+def get_pg_infos_from(source: Literal["from", "to"]):
     _source, _source_lower = source.upper(), source.lower()
 
     def _get_pg_root(
@@ -454,37 +661,46 @@ def get_pg_root_from(source: Literal["from", "to"]):
             help=f"PG Password {_source}",
             arg_name=f"pg_password_{_source}",
         ),
-    ):
-        url = f"postgresql://{pg_user}:{pg_password}@{pg_host}:{pg_port}"
-        pg_clean = url.replace(f":{pg_password}", ":********")
-        logs.debug(f"PG url {source}: {pg_clean}")
-        return url
+        ssl_mode: str | None = Option(
+            os.getenv(f"PG_SSL_MODE_{_source}"),
+            f"--ssl-mode-{_source_lower}",
+            help=f"SSL mode for {_source} (require, verify-ca, verify-full)",
+            arg_name=f"ssl_mode_{_source}",
+        ),
+        ssl_ca: Path | None = Option(
+            os.getenv(f"PG_SSL_CA_{_source}"),
+            f"--ssl-ca-{_source_lower}",
+            help=f"Path to CA certificate for {_source}",
+            arg_name=f"ssl_ca_{_source}",
+        ),
+        ssl_cert: Path | None = Option(
+            os.getenv(f"PG_SSL_CERT_{_source}"),
+            f"--ssl-cert-{_source_lower}",
+            help=f"Path to client certificate for {_source}",
+            arg_name=f"ssl_cert_{_source}",
+        ),
+        ssl_key: Path | None = Option(
+            os.getenv(f"PG_SSL_KEY_{_source}"),
+            f"--ssl-key-{_source_lower}",
+            help=f"Path to client private key for {_source}",
+            arg_name=f"ssl_key_{_source}",
+        ),
+    ) -> PGConnectionInfo:
+        info = PGConnectionInfo(
+            pg_user=pg_user,
+            pg_password=pg_password,
+            pg_host=pg_host,
+            pg_port=pg_port,
+            ssl_mode=ssl_mode,
+            ssl_ca=ssl_ca,
+            ssl_cert=ssl_cert,
+            ssl_key=ssl_key,
+        )
+
+        logs.debug(f"PG url {source}: {info.obfuscated_dsn}")
+        return info
 
     return _get_pg_root
-
-
-class PGUriInfos(typing.TypedDict):
-    user: str
-    password: str
-    host: str
-    port: int
-    database: str | None
-
-
-_PG_URI_REG = re.compile(r"postgresql:\/\/(?P<user>.*):(?P<password>.*)@(?P<host>.*):(?P<port>\d+)(\/(?P<dbname>.*))?")
-
-
-def parse_pg_uri(uri: str) -> PGUriInfos:
-    if match := _PG_URI_REG.match(uri):
-        group = match.groupdict()
-        return {
-            "user": group["user"],
-            "password": group["password"],
-            "host": group["host"],
-            "port": int(group["port"]),
-            "database": group["dbname"],
-        }
-    raise ValueError(f"Invalid PG uri: {uri}")
 
 
 @contextmanager
@@ -500,23 +716,35 @@ def temp_env(new_env: dict):
         os.environ.update(_env)
 
 
-@contextmanager
-def temp_pg_env(pg_url: str):
-    """
-    Overrides the PG environment variables with the given pg_url
-    """
-    _pg_infos = parse_pg_uri(pg_url)
-    _env = {
-        "PGHOST": _pg_infos["host"],
-        "PGPORT": str(_pg_infos["port"]),
-        "PGUSER": _pg_infos["user"],
-        "PGPASSWORD": _pg_infos["password"],
-    }
-    if _pg_infos["database"]:
-        _env["PGDATABASE"] = _pg_infos["database"]
-
-    with temp_env(_env):
-        yield
+# @contextmanager
+# def temp_pg_env(pg_url: str, *, source: Literal["from", "to"] | None = None):
+#     """
+#     Overrides the PG environment variables with the given pg_url.
+#
+#     Args:
+#         pg_url: PostgreSQL connection URL
+#         source: Optional "from" or "to" to include SSL environment variables for that source
+#     """
+#     pg_info = PGConnectionInfo.from_uri(pg_url)
+#     _env = {
+#         "PGHOST": pg_info.pg_host,
+#         "PGPORT": str(pg_info.pg_port),
+#         "PGUSER": pg_info.pg_user,
+#         "PGPASSWORD": pg_info.pg_password,
+#     }
+#     if pg_info.database:
+#         _env["PGDATABASE"] = pg_info.database
+#
+#     # Add SSL environment variables from URI
+#     _env.update(pg_info.get_env_vars())
+#
+#     # Add SSL environment variables from environment if source is specified
+#     # (these will override URI values if present)
+#     if source is not None:
+#         _env.update(get_ssl_envs_from(source))
+#
+#     with temp_env(_env):
+#         yield
 
 
 async def init_connection(conn: asyncpg.Connection):
@@ -530,7 +758,11 @@ _CLEAN_STR_REG = re.compile(r"^E\s+|\s{2,}", flags=re.MULTILINE)
 
 
 def _clean_str(msg: str) -> str:
-    return _CLEAN_STR_REG.sub(" ", msg).strip()
+    # Replace 'E' prefix and multiple spaces, then strip leading/trailing whitespace
+    cleaned = _CLEAN_STR_REG.sub(" ", msg)
+    # Remove leading spaces from each line
+    lines = [line.strip() for line in cleaned.split("\n")]
+    return "\n".join(lines).strip()
 
 
 def extract_pg_error(msg: str) -> list[str]:
