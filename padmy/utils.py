@@ -15,7 +15,18 @@ import asyncpg
 from piou import Option, Password
 
 from padmy import env
-from .env import PG_HOST, PG_PORT, PG_USER, PG_DATABASE, PG_PASSWORD, PG_SSL_MODE, PG_SSL_CA, PG_SSL_CERT, PG_SSL_KEY
+from .env import (
+    PG_HOST,
+    PG_PORT,
+    PG_USER,
+    PG_DATABASE,
+    PG_PASSWORD,
+    PG_SSL_MODE,
+    PG_SSL_CA,
+    PG_SSL_CERT,
+    PG_SSL_KEY,
+    PG_SSL_PASSWORD,
+)
 from .logs import logs
 
 PgHost = Option(PG_HOST, "--host", help="PG Host")
@@ -79,6 +90,7 @@ def create_ssl_context(
     ssl_ca: Path | None = None,
     ssl_cert: Path | None = None,
     ssl_key: Path | None = None,
+    ssl_password: str | None = None,
 ) -> ssl.SSLContext | None:
     """
     Creates an SSL context for PostgreSQL connections with mTLS support.
@@ -88,6 +100,7 @@ def create_ssl_context(
         ssl_ca: Path to CA certificate file
         ssl_cert: Path to client certificate file
         ssl_key: Path to client private key file
+        ssl_password: Password for encrypted private key file
 
     Returns:
         SSLContext configured for mTLS, or None if SSL is not configured
@@ -102,20 +115,21 @@ def create_ssl_context(
     # Load CA certificate if provided
     if ssl_ca:
         if not ssl_ca.exists():
-            raise FileNotFoundError(f"CA certificate not found: {ssl_ca!r}")
-        logs.debug(f"Loading CA certificate from {ssl_ca!r}")
-        ctx.load_verify_locations(cafile=ssl_ca)
+            raise FileNotFoundError(f"CA certificate not found: {ssl_ca.absolute()!r}")
+        logs.debug(f"Loading CA certificate from {ssl_ca.absolute()!r}")
+        ctx.load_verify_locations(cafile=str(ssl_ca))
 
     # Load client certificate and key for mTLS if provided
     if ssl_cert and ssl_key:
-        # cert_path = Path(ssl_cert)
-        # key_path = Path(ssl_key)
         if not ssl_cert.exists():
-            raise FileNotFoundError(f"Client certificate not found: {ssl_cert}")
+            raise FileNotFoundError(f"Client certificate not found: {ssl_cert.absolute()}")
         if not ssl_key.exists():
-            raise FileNotFoundError(f"Client key not found: {ssl_key}")
-        logs.debug(f"Loading client certificate from {ssl_cert} and key from {ssl_key}")
-        ctx.load_cert_chain(certfile=ssl_cert, keyfile=ssl_key)
+            raise FileNotFoundError(f"Client key not found: {ssl_key.absolute()}")
+        logs.debug(f"Loading client certificate from {ssl_cert.absolute()} and key from {ssl_key.absolute()}")
+
+        # Load certificate chain with optional password for encrypted private key
+        password_bytes = ssl_password.encode() if ssl_password else None
+        ctx.load_cert_chain(certfile=str(ssl_cert), keyfile=str(ssl_key), password=password_bytes)
     elif ssl_cert or ssl_key:
         raise ValueError("Both ssl_cert and ssl_key must be provided together for mTLS")
 
@@ -173,11 +187,13 @@ def get_pg_envs():
     if PG_SSL_MODE:
         envs["PGSSLMODE"] = PG_SSL_MODE
     if PG_SSL_CA:
-        envs["PGSSLROOTCERT"] = PG_SSL_CA
+        envs["PGSSLROOTCERT"] = str(PG_SSL_CA)
     if PG_SSL_CERT:
-        envs["PGSSLCERT"] = PG_SSL_CERT
+        envs["PGSSLCERT"] = str(PG_SSL_CERT)
     if PG_SSL_KEY:
-        envs["PGSSLKEY"] = PG_SSL_KEY
+        envs["PGSSLKEY"] = str(PG_SSL_KEY)
+    if PG_SSL_PASSWORD:
+        envs["PGSSLPASSWORD"] = PG_SSL_PASSWORD
     return envs
 
 
@@ -406,6 +422,7 @@ class PGConnectionInfo:
     ssl_ca: Path | None = None
     ssl_cert: Path | None = None
     ssl_key: Path | None = None
+    ssl_password: str | None = None
     database: str | None = None
 
     @classmethod
@@ -477,6 +494,7 @@ class PGConnectionInfo:
             ssl_ca=self.ssl_ca,
             ssl_cert=self.ssl_cert,
             ssl_key=self.ssl_key,
+            ssl_password=self.ssl_password or PG_SSL_PASSWORD,
         )
         return ssl_context
 
@@ -546,12 +564,12 @@ class PGConnectionInfo:
             os.environ.update(old_env)
 
     @contextlib.asynccontextmanager
-    async def get_conn(self, database: str | None = None):
+    async def get_conn(self, database: str | None = None, timeout: int = 5):
         _database = database if database is not None else self.database
         if _database is None:
             raise ValueError("Either database parameter or PGConnectionInfo.database must be set")
         dsn = f"{self.pg_url}/{_database}"
-        conn = await asyncpg.connect(dsn=dsn, ssl=self.ssl_context)
+        conn = await asyncpg.connect(dsn=dsn, ssl=self.ssl_context, timeout=timeout)
         await init_connection(conn)
         try:
             yield conn
@@ -559,7 +577,7 @@ class PGConnectionInfo:
             await conn.close()
 
     @contextlib.asynccontextmanager
-    async def get_pool(self, database: str | None = None) -> AsyncIterator[asyncpg.Pool]:
+    async def get_pool(self, database: str | None = None, timeout: int = 5) -> AsyncIterator[asyncpg.Pool]:
         if database is not None:
             _database = database
         else:
@@ -567,7 +585,7 @@ class PGConnectionInfo:
         if _database is None:
             raise ValueError("Either database parameter or PGConnectionInfo.database must be set")
         dsn = f"{self.dsn}/{_database}"
-        async with asyncpg.create_pool(dsn=dsn, ssl=self.ssl_context, init=init_connection) as pool:
+        async with asyncpg.create_pool(dsn=dsn, ssl=self.ssl_context, init=init_connection, timeout=timeout) as pool:
             yield pool
 
 
@@ -612,6 +630,10 @@ def get_pg_infos(
 def get_pg_infos_from(source: Literal["from", "to"]):
     _source, _source_lower = source.upper(), source.lower()
 
+    _source_ssl_ca = os.getenv(f"PGSSLROOTCERT_{_source}")
+    _source_ssl_cert = os.getenv(f"PGSSLCERT_{_source}")
+    _source_ssl_key = os.getenv(f"PGSSLKEY_{_source}")
+
     def _get_pg_root(
         pg_host: str = Option(
             os.getenv(f"PG_HOST_{_source}", "localhost"),
@@ -638,25 +660,25 @@ def get_pg_infos_from(source: Literal["from", "to"]):
             arg_name=f"pg_password_{_source}",
         ),
         ssl_mode: str | None = Option(
-            os.getenv(f"PG_SSL_MODE_{_source}"),
+            os.getenv(f"PGSSLMODE_{_source}"),
             f"--ssl-mode-{_source_lower}",
             help=f"SSL mode for {_source} (require, verify-ca, verify-full)",
             arg_name=f"ssl_mode_{_source}",
         ),
         ssl_ca: Path | None = Option(
-            os.getenv(f"PG_SSL_CA_{_source}"),
+            (Path(_source_ssl_ca) if _source_ssl_ca and _source_ssl_ca != "system" else None),
             f"--ssl-ca-{_source_lower}",
             help=f"Path to CA certificate for {_source}",
             arg_name=f"ssl_ca_{_source}",
         ),
         ssl_cert: Path | None = Option(
-            os.getenv(f"PG_SSL_CERT_{_source}"),
+            Path(_source_ssl_cert) if _source_ssl_cert else None,
             f"--ssl-cert-{_source_lower}",
             help=f"Path to client certificate for {_source}",
             arg_name=f"ssl_cert_{_source}",
         ),
         ssl_key: Path | None = Option(
-            os.getenv(f"PG_SSL_KEY_{_source}"),
+            Path(_source_ssl_key) if _source_ssl_key else None,
             f"--ssl-key-{_source_lower}",
             help=f"Path to client private key for {_source}",
             arg_name=f"ssl_key_{_source}",

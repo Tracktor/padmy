@@ -198,7 +198,6 @@ async def get_columns(conn: asyncpg.Connection, tables: list[Table]) -> dict[str
     data = await conn.fetch(query, [x.full_name for x in tables])
     columns = {}
     for x in data:
-        print(x["columns"])
         columns[x["full_name"]] = [Column(**col) for col in x["columns"]]
     return columns
 
@@ -292,7 +291,7 @@ class Database:
         if not _schemas:
             raise ValueError("No schemas to explore")
 
-        _schemas_str = ", ".format()
+        _schemas_str = ", ".join(_schemas)
         async with pool.acquire() as conn:
             logs.debug(f"Loading tables for {_schemas_str}...")
             self.tables = await get_tables(conn, _schemas)
