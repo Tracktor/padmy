@@ -198,7 +198,6 @@ async def get_columns(conn: asyncpg.Connection, tables: list[Table]) -> dict[str
     data = await conn.fetch(query, [x.full_name for x in tables])
     columns = {}
     for x in data:
-        print(x["columns"])
         columns[x["full_name"]] = [Column(**col) for col in x["columns"]]
     return columns
 
@@ -292,7 +291,7 @@ class Database:
         if not _schemas:
             raise ValueError("No schemas to explore")
 
-        _schemas_str = ", ".format()
+        _schemas_str = ", ".join(_schemas)
         async with pool.acquire() as conn:
             logs.debug(f"Loading tables for {_schemas_str}...")
             self.tables = await get_tables(conn, _schemas)
@@ -315,6 +314,13 @@ class Database:
             _tables[_pk.full_name].primary_keys.append(_pk)
 
         for _fk in fks:
+            # Skip foreign keys that reference tables outside the analyzed schemas
+            if _fk.foreign_full_name not in _tables:
+                logs.debug(
+                    f"Skipping foreign key from {_fk.full_name} to {_fk.foreign_full_name} (target table not in analyzed schemas)"
+                )
+                continue
+
             _tables[_fk.full_name].foreign_keys.append(_fk)
             _tables[_fk.full_name].parent_tables.add(_tables[_fk.foreign_full_name])
             _tables[_fk.foreign_full_name].child_tables.add(_tables[_fk.full_name])

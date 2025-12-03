@@ -3,16 +3,16 @@ import filecmp
 from pathlib import Path
 from typing import Iterator
 
-from padmy.utils import pg_dump, temp_pg_env, remove_restrict_clauses
+from padmy.utils import pg_dump, remove_restrict_clauses, PGConnectionInfo
 
 
 def compare_databases(
-    from_pg_url: str,
+    from_pg_url: str | PGConnectionInfo,
     database: str,
     schemas: list[str],
     dump_dir: Path,
     *,
-    to_pg_url: str | None = None,
+    to_pg_url: str | PGConnectionInfo | None = None,
     db_to: str | None = None,
     no_privileges: bool = True,
     ignore_restrict: bool = True,
@@ -30,14 +30,22 @@ def compare_databases(
     if no_privileges:
         _cmd.append("--no-privileges")
 
-    with temp_pg_env(from_pg_url):
-        pg_dump(database, schemas, dump_path=str(dump_1), options=_cmd, get_env=False)
+    # Determine source connection info
+    pg_from_info = from_pg_url if isinstance(from_pg_url, PGConnectionInfo) else PGConnectionInfo.from_uri(from_pg_url)
+
+    with pg_from_info.temp_env(include_database=False):
+        pg_dump(database, schemas, dump_path=str(dump_1), options=_cmd)
         if ignore_restrict:
             remove_restrict_clauses(dump_1)
 
-    _to_pg_url = to_pg_url or from_pg_url
-    with temp_pg_env(_to_pg_url):
-        pg_dump(db_to, schemas, dump_path=str(dump_2), options=_cmd, get_env=False)
+    # Determine target connection info (defaults to from_pg_url if not provided)
+    if to_pg_url is not None:
+        pg_to_info = to_pg_url if isinstance(to_pg_url, PGConnectionInfo) else PGConnectionInfo.from_uri(to_pg_url)
+    else:
+        pg_to_info = pg_from_info
+
+    with pg_to_info.temp_env(include_database=False):
+        pg_dump(db_to, schemas, dump_path=str(dump_2), options=_cmd)
         if ignore_restrict:
             remove_restrict_clauses(dump_2)
 

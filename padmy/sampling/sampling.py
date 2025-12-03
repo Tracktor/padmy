@@ -17,15 +17,14 @@ from ..utils import (
     drop_db,
     exec_psql,
     check_extension_exists,
-    parse_pg_uri,
-    temp_env,
+    PGConnectionInfo,
 )
 
 
 def copy_database(
-    from_pg_uri: str,
+    from_pg_uri: str | PGConnectionInfo,
     from_db: str,
-    to_pg_uri: str,
+    to_pg_uri: str | PGConnectionInfo,
     to_db: str,
     schemas: list[str],
     drop_public: bool = False,
@@ -36,13 +35,15 @@ def copy_database(
     before restoring and avoid ' ERROR:  schema "public" already exists'
     (useful if you have *public* specified in your schemas list)
     """
-    pg_from_infos, pg_target_infos = parse_pg_uri(from_pg_uri), parse_pg_uri(to_pg_uri)
     for cmd in ["pg_dump", "createdb", "dropdb", "pg_restore", "psql"]:
         check_cmd(cmd)
 
+    pg_from_info = from_pg_uri if isinstance(from_pg_uri, PGConnectionInfo) else PGConnectionInfo.from_uri(from_pg_uri)
+    pg_target_info = to_pg_uri if isinstance(to_pg_uri, PGConnectionInfo) else PGConnectionInfo.from_uri(to_pg_uri)
+
     with tempfile.NamedTemporaryFile(suffix=".dump") as tmp_file:
-        # tmp_file = '/tmp/schema.dump'
-        with temp_env({"PG_PASSWORD": pg_from_infos["password"]}):
+        # Dump source database schema
+        with pg_from_info.temp_env(include_database=False):
             pg_dump(
                 schemas=schemas,
                 dump_path=tmp_file.name,
@@ -53,29 +54,21 @@ def copy_database(
                     "--no-privileges",
                     "--extension=*",
                 ],
-                user=pg_from_infos["user"],
-                host=pg_from_infos["host"],
-                port=pg_from_infos["port"],
                 database=from_db,
             )
 
-        _partial_target_infos: dict = dict(pg_target_infos)
-        _partial_target_infos.pop("database")
-        with temp_env({"PG_PASSWORD": _partial_target_infos.pop("password")}):
-            drop_db(
-                to_db,
-                **_partial_target_infos,
-                if_exists=True,
-            )
-            create_db(database=to_db, **_partial_target_infos)
+        # Restore to target database
+        with pg_target_info.temp_env(include_database=False):
+            drop_db(to_db, if_exists=True)
+            create_db(database=to_db)
 
             if "public" in schemas or drop_public:
-                exec_psql(to_db, "DROP SCHEMA public;", **_partial_target_infos)
+                exec_psql(to_db, "DROP SCHEMA public;")
+
             pg_restore(
                 dump_path=tmp_file.name,
                 database=to_db,
                 options=["--no-owner", "--no-privileges"],
-                **_partial_target_infos,
             )
 
 
