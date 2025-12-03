@@ -160,21 +160,6 @@ def create_ssl_context(
     return ctx
 
 
-# def get_ssl_context() -> ssl.SSLContext | None:
-#     """
-#     Creates an SSL context from environment variables.
-#
-#     Returns:
-#         SSLContext configured from environment variables, or None if SSL is not configured
-#     """
-#     return create_ssl_context(
-#         ssl_mode=PG_SSL_MODE,
-#         ssl_ca=PG_SSL_CA,
-#         ssl_cert=PG_SSL_CERT,
-#         ssl_key=PG_SSL_KEY,
-#     )
-
-
 def get_pg_envs():
     reload(env)
     envs = {
@@ -568,7 +553,7 @@ class PGConnectionInfo:
         _database = database if database is not None else self.database
         if _database is None:
             raise ValueError("Either database parameter or PGConnectionInfo.database must be set")
-        dsn = f"{self.pg_url}/{_database}"
+        dsn = f"{self.dsn}/{_database}"
         conn = await asyncpg.connect(dsn=dsn, ssl=self.ssl_context, timeout=timeout)
         await init_connection(conn)
         try:

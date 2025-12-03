@@ -97,12 +97,8 @@ async def sample_main(
     db.load_config(config)
     pretty_print_stats(db)
 
-    # Set database names for connections
-    pg_from_info.database = from_db
-    pg_to_info.database = to_db
-
-    async with pg_from_info.get_conn() as conn:
-        async with pg_to_info.get_conn() as target_conn:
+    async with pg_from_info.get_conn(database=from_db) as conn:
+        async with pg_to_info.get_conn(database=to_db) as target_conn:
             await sample_database(conn, target_conn, db, show_progress=progress)
 
     # Explore target database

@@ -344,7 +344,7 @@ class TestErrorMessageExtraction:
     )
 
     @pytest.mark.parametrize("data,expected", [_full_error])
-    def test_extract_error_message(cls, data, expected):
+    def test_extract_error_message(self, data, expected):
         from padmy.utils import extract_pg_error
 
         assert extract_pg_error(data) == expected

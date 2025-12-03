@@ -333,7 +333,7 @@ Then create a new notebook and run the following code:
 ```python
 from dash import Dash
 from padmy.sampling import network, viz, sampling
-from padmy.utils import init_connection, get_ssl_context
+from padmy.utils import init_connection
 import asyncpg
 
 PG_URL = 'postgresql://postgres:postgres@localhost:5432/test'
@@ -342,7 +342,7 @@ app = Dash(__name__)
 
 db = sampling.Database(name='test')
 
-async with asyncpg.create_pool(PG_URL, init=init_connection, ssl=ssl_context) as pool:
+async with asyncpg.create_pool(PG_URL, init=init_connection) as pool:
     await db.explore(pool, ['public'])
 
 g = network.convert_db(db)

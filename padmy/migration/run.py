@@ -1,14 +1,13 @@
-import os
 import shutil
 import tempfile
 from pathlib import Path
 from typing import Literal
 
-from piou import Option, Derived, CommandGroup, Password, CommandError
+from piou import Option, Derived, CommandGroup, CommandError
 
 from padmy.env import SQL_DIR, MIGRATION_DIR, CONSOLE
 from padmy.logs import logs
-from padmy.utils import get_pg_infos, PgHost, PgPort, PgUser, PgDatabase, PgPassword, PGConnectionInfo
+from padmy.utils import get_pg_infos, PgDatabase, PGConnectionInfo
 
 MIGRATION_DESCRIPTION = """
 Utilities to handle schema migrations with PostgresSQL.  
@@ -112,28 +111,21 @@ async def migrate_setup_main(pg_infos: PGConnectionInfo = Derived(get_pg_infos))
 @migration.command(cmd="verify", help="Verify that a migration is valid")
 def migrate_verify_main(
     db: str = PgDatabase,
-    pg_host: str = PgHost,
-    pg_port: int = PgPort,
-    pg_user: str = PgUser,
-    pg_password: Password = PgPassword,
+    pg_infos: PGConnectionInfo = Derived(get_pg_infos),
     schemas: list[str] = Option(..., "--schemas", help="Schemas impacted by the migration"),
     sql_dir: Path = MigrationDir,
 ):
-    os.environ["PG_HOST"] = pg_host
-    os.environ["PG_PORT"] = str(pg_port)
-    os.environ["PG_USER"] = pg_user
-    os.environ["PG_PASSWORD"] = pg_password
-
     from .migration import migrate_verify, MigrationError
 
     try:
         with tempfile.TemporaryDirectory() as dump_dir:
-            migrate_verify(
-                database=db,
-                migration_folder=sql_dir,
-                schemas=schemas,
-                dump_dir=Path(dump_dir),
-            )
+            with pg_infos.temp_env():
+                migrate_verify(
+                    database=db,
+                    migration_folder=sql_dir,
+                    schemas=schemas,
+                    dump_dir=Path(dump_dir),
+                )
     except MigrationError as e:
         logs.error(e.msg)
         logs.debug(e.diff)
