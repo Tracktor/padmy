@@ -546,8 +546,13 @@ class PGConnectionInfo:
             os.environ.update(old_env)
 
     @contextlib.asynccontextmanager
-    async def get_conn(self):
-        conn = await asyncpg.connect(dsn=self.pg_url, ssl=self.ssl_context)
+    async def get_conn(self, database: str | None = None):
+        _database = database if database is not None else self.database
+        if _database is None:
+            raise ValueError("Either database parameter or PGConnectionInfo.database must be set")
+        dsn = f"{self.pg_url}/{_database}"
+        conn = await asyncpg.connect(dsn=dsn, ssl=self.ssl_context)
+        await init_connection(conn)
         try:
             yield conn
         finally:
@@ -562,7 +567,7 @@ class PGConnectionInfo:
         if _database is None:
             raise ValueError("Either database parameter or PGConnectionInfo.database must be set")
         dsn = f"{self.dsn}/{_database}"
-        async with asyncpg.create_pool(dsn=dsn, ssl=self.ssl_context) as pool:
+        async with asyncpg.create_pool(dsn=dsn, ssl=self.ssl_context, init=init_connection) as pool:
             yield pool
 
 
@@ -602,35 +607,6 @@ def get_pg_infos(
         ssl_key=ssl_key,
         ssl_mode=ssl_mode,
     )
-
-
-# def get_pg_url(pg_url: str = Derived(get_pg_root), pg_database: str = PgDatabase):
-#     return f"{pg_url}/{pg_database}"
-
-
-def get_ssl_envs_from(source: Literal["from", "to"]) -> dict[str, str]:
-    """
-    Gets SSL environment variables for "from" or "to" connections.
-
-    Args:
-        source: Either "from" or "to" to specify which set of environment variables to use
-
-    Returns:
-        Dictionary of SSL environment variables for PostgreSQL CLI tools
-    """
-    _source = source.upper()
-    envs = {}
-
-    if ssl_mode := os.getenv(f"PG_SSL_MODE_{_source}"):
-        envs["PGSSLMODE"] = ssl_mode
-    if ssl_ca := os.getenv(f"PG_SSL_CA_{_source}"):
-        envs["PGSSLROOTCERT"] = ssl_ca
-    if ssl_cert := os.getenv(f"PG_SSL_CERT_{_source}"):
-        envs["PGSSLCERT"] = ssl_cert
-    if ssl_key := os.getenv(f"PG_SSL_KEY_{_source}"):
-        envs["PGSSLKEY"] = ssl_key
-
-    return envs
 
 
 def get_pg_infos_from(source: Literal["from", "to"]):
@@ -701,50 +677,6 @@ def get_pg_infos_from(source: Literal["from", "to"]):
         return info
 
     return _get_pg_root
-
-
-@contextmanager
-def temp_env(new_env: dict):
-    """
-    Overrides the environment variables with the given ones
-    """
-    _env = os.environ.copy()
-    os.environ.update(new_env)
-    try:
-        yield
-    finally:
-        os.environ.update(_env)
-
-
-# @contextmanager
-# def temp_pg_env(pg_url: str, *, source: Literal["from", "to"] | None = None):
-#     """
-#     Overrides the PG environment variables with the given pg_url.
-#
-#     Args:
-#         pg_url: PostgreSQL connection URL
-#         source: Optional "from" or "to" to include SSL environment variables for that source
-#     """
-#     pg_info = PGConnectionInfo.from_uri(pg_url)
-#     _env = {
-#         "PGHOST": pg_info.pg_host,
-#         "PGPORT": str(pg_info.pg_port),
-#         "PGUSER": pg_info.pg_user,
-#         "PGPASSWORD": pg_info.pg_password,
-#     }
-#     if pg_info.database:
-#         _env["PGDATABASE"] = pg_info.database
-#
-#     # Add SSL environment variables from URI
-#     _env.update(pg_info.get_env_vars())
-#
-#     # Add SSL environment variables from environment if source is specified
-#     # (these will override URI values if present)
-#     if source is not None:
-#         _env.update(get_ssl_envs_from(source))
-#
-#     with temp_env(_env):
-#         yield
 
 
 async def init_connection(conn: asyncpg.Connection):

@@ -1,11 +1,9 @@
 import asyncio
 import logging
-import ssl
 import sys
 import tempfile
 from pathlib import Path
 
-import asyncpg
 from faker import Faker
 from piou import Cli, Derived, Option
 
@@ -15,7 +13,7 @@ from padmy.db import pretty_print_stats, pprint_compared_dbs, Database
 from padmy.logs import setup_logging, logs
 from padmy.migration import migration
 from padmy.sampling import sample_database, copy_database
-from padmy.utils import get_pg_infos, get_pg_infos_from, init_connection, PGConnectionInfo
+from padmy.utils import get_pg_infos, get_pg_infos_from, PGConnectionInfo
 from padmy.env import CONSOLE
 
 cli = Cli("Padmy utility commands")
@@ -33,12 +31,11 @@ def on_process(verbose: bool = False, verbose2: bool = False):
 cli.set_options_processor(on_process)
 
 
-async def get_explored_db(
-    pg_url: str, db_name: str, schemas: list[str], ssl_context: ssl.SSLContext | None = None
-) -> Database:
+async def get_explored_db(pg_info: PGConnectionInfo, db_name: str, schemas: list[str]) -> Database:
+    """Explore a database and return the Database object."""
     db = Database(name=db_name)
     logs.info(f"Gathering information about {db_name!r}...")
-    async with asyncpg.create_pool(pg_url, init=init_connection, ssl=ssl_context) as pool:
+    async with pg_info.get_pool(db_name) as pool:
         await db.explore(pool, schemas)
     return db
 
@@ -95,9 +92,9 @@ async def sample_main(
         else:
             logs.info("Done!")
 
-    db = await get_explored_db(pg_from_info.pg_url, from_db, _schemas, ssl_context=pg_from_info.ssl_context)
+    # Explore source database
+    db = await get_explored_db(pg_from_info, from_db, _schemas)
     db.load_config(config)
-
     pretty_print_stats(db)
 
     # Set database names for connections
@@ -108,8 +105,8 @@ async def sample_main(
         async with pg_to_info.get_conn() as target_conn:
             await sample_database(conn, target_conn, db, show_progress=progress)
 
-    new_db = await get_explored_db(pg_to_info.pg_url, to_db, _schemas, ssl_context=pg_to_info.ssl_context)
-
+    # Explore target database
+    new_db = await get_explored_db(pg_to_info, to_db, _schemas)
     pprint_compared_dbs(db, new_db)
 
 
@@ -148,9 +145,7 @@ async def analyze_main(
     """
     from padmy.db import pretty_print_stats
 
-    pg_infos.database = db_name
-
-    db = await get_explored_db(pg_infos.dsn, db_name, schemas)
+    db = await get_explored_db(pg_infos, db_name, schemas)
 
     if not show_graphs:
         pretty_print_stats(db)
@@ -171,8 +166,8 @@ async def compare_db_main(
     from padmy.db import pprint_compared_dbs
 
     db1, db2 = await asyncio.gather(
-        get_explored_db(pg_url.pg_url, from_db, schemas, ssl_context=pg_url.ssl_context),
-        get_explored_db(pg_url.pg_url, to_db, schemas, ssl_context=pg_url.ssl_context),
+        get_explored_db(pg_url, from_db, schemas),
+        get_explored_db(pg_url, to_db, schemas),
     )
 
     pprint_compared_dbs(db1, db2)
