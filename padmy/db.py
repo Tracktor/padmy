@@ -314,6 +314,13 @@ class Database:
             _tables[_pk.full_name].primary_keys.append(_pk)
 
         for _fk in fks:
+            # Skip foreign keys that reference tables outside the analyzed schemas
+            if _fk.foreign_full_name not in _tables:
+                logs.debug(
+                    f"Skipping foreign key from {_fk.full_name} to {_fk.foreign_full_name} (target table not in analyzed schemas)"
+                )
+                continue
+
             _tables[_fk.full_name].foreign_keys.append(_fk)
             _tables[_fk.full_name].parent_tables.add(_tables[_fk.foreign_full_name])
             _tables[_fk.foreign_full_name].child_tables.add(_tables[_fk.full_name])
