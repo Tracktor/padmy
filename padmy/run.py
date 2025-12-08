@@ -190,7 +190,7 @@ def dump_main(
     if schema_only:
         options.append("--schema-only")
 
-    with pg_infos.temp_env():
+    with pg_infos.temp_env(include_database=False):
         result = pg_dump(
             database=database,
             schemas=schemas,
