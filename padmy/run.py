@@ -169,6 +169,44 @@ async def compare_db_main(
     pprint_compared_dbs(db1, db2)
 
 
+@cli.command(cmd="dump", help="Dump a database using pg_dump")
+def dump_main(
+    pg_infos: PGConnectionInfo = Derived(get_pg_infos),
+    output: Path | None = Option(
+        None, "-o", "--output", help="Output file path (prints to stdout if not set)", raise_path_does_not_exist=False
+    ),
+    database: str = Option(..., "--db", help="Database to dump"),
+    schemas: list[str] = Option(..., "--schemas", help="Schemas to dump"),
+    with_grants: bool = Option(False, "--with-grants", help="Include owner and privileges"),
+    with_comments: bool = Option(True, "--with-comments", help="Include comments"),
+    schema_only: bool = Option(True, "--schema-only", help="Dump only schema, no data"),
+):
+    """
+    Convenience wrapper around pg_dump. Dumps schema only without owner/privileges by default.
+    """
+    from padmy.utils import pg_dump
+
+    options = []
+    if schema_only:
+        options.append("--schema-only")
+
+    with pg_infos.temp_env(include_database=False):
+        result = pg_dump(
+            database=database,
+            schemas=schemas,
+            dump_path=str(output) if output else None,
+            options=options if options else None,
+            with_grants=with_grants,
+            with_comments=with_comments,
+            get_env=False,
+        )
+
+    if output:
+        logs.info(f"Dump written to {output}")
+    elif result:
+        print(result)
+
+
 @cli.command(cmd="schema-diff", help="Compare the schemas of 2 databases")
 def schema_diff(
     pg_from_info: PGConnectionInfo = Derived(get_pg_infos_from("from")),
