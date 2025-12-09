@@ -198,6 +198,7 @@ def dump_main(
             options=options if options else None,
             with_grants=with_grants,
             with_comments=with_comments,
+            on_stderr=lambda x: logs.error(x),
             get_env=False,
         )
 
