@@ -178,8 +178,9 @@ def dump_main(
     database: str = Option(..., "--db", help="Database to dump"),
     schemas: list[str] = Option(..., "--schemas", help="Schemas to dump"),
     with_grants: bool = Option(False, "--with-grants", help="Include owner and privileges"),
-    with_comments: bool = Option(True, "--with-comments", help="Include comments"),
-    schema_only: bool = Option(True, "--schema-only", help="Dump only schema, no data"),
+    with_comments: bool = Option(False, "--with-comments", help="Include comments"),
+    schema_only: bool = Option(False, "--schema-only", help="Dump only schema, no data"),
+    no_owner: bool = Option(False, "--no-owner", help="Exclude ownership statements"),
 ):
     """
     Convenience wrapper around pg_dump. Dumps schema only without owner/privileges by default.
@@ -189,6 +190,8 @@ def dump_main(
     options = []
     if schema_only:
         options.append("--schema-only")
+    if no_owner:
+        options.append("--no-owner")
 
     with pg_infos.temp_env(include_database=False):
         result = pg_dump(
