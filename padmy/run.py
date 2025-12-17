@@ -181,6 +181,7 @@ def dump_main(
     with_comments: bool = Option(False, "--with-comments", help="Include comments"),
     schema_only: bool = Option(False, "--schema-only", help="Dump only schema, no data"),
     no_owner: bool = Option(False, "--no-owner", help="Exclude ownership statements"),
+    restrict_key: str | None = Option(None, "--restrict-key", help="Restrict key to be written in \restrict"),
 ):
     """
     Convenience wrapper around pg_dump. Dumps schema only without owner/privileges by default.
@@ -201,6 +202,7 @@ def dump_main(
             options=options if options else None,
             with_grants=with_grants,
             with_comments=with_comments,
+            restrict_key=restrict_key,
             on_stderr=lambda x: logs.error(x),
             get_env=False,
         )

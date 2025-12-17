@@ -221,6 +221,7 @@ def pg_dump(
     options: list[str] | None = None,
     with_grants: bool = True,
     with_comments: bool = True,
+    restrict_key: str | None = None,
     *,
     user: str | None = None,
     password: str | None = None,
@@ -241,6 +242,8 @@ def pg_dump(
         cmd += ["--no-owner", "--no-privileges"]
     if not with_comments:
         cmd += ["--no-comments"]
+    if restrict_key is not None:
+        cmd += [f"--restrict-key={restrict_key}"]
     if options:
         cmd += options
 
