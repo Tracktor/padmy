@@ -72,7 +72,7 @@ jobs:
           before-steps:
             - run:
                 name: Install dependencies
-                command: uv sync --locked --group network --dev
+                command: uv sync --locked --group network --dev --group anonymize
             - run:
                 name: Initializing DB
                 command: ./tests/static/init-pg.sh
