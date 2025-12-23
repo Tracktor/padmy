@@ -205,3 +205,15 @@ workflows:
           include_network: true
           context: *production_context
           filters: *filters_only_tags
+      # PostgreSQL 18
+      - build-publish-docker:
+          name: build-publish-docker-18
+          pg_version: "18"
+          context: *production_context
+          filters: *filters_only_tags
+      - build-publish-docker:
+          name: build-publish-docker-network-18
+          pg_version: "18"
+          include_network: true
+          context: *production_context
+          filters: *filters_only_tags

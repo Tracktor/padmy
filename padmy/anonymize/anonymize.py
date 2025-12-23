@@ -5,7 +5,11 @@ from functools import partial
 from typing import Any, Iterator
 
 import asyncpg
-from faker import Faker
+
+try:
+    from faker import Faker
+except ImportError:
+    raise ImportError('Please install faker or padmy with "anonymize" to use this module')
 
 from padmy.logs import logs
 from ..config import Config, ConfigTable, FieldType, AnoFields

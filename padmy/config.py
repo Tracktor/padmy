@@ -1,13 +1,8 @@
 from dataclasses import dataclass, field
 from pathlib import Path
-
-# else:
-#     from typing import Self
 from typing import Literal
 
 import yaml
-
-# if sys.version_info.minor < 11 and sys.version_info.major >= 3:
 
 FieldType = Literal["EMAIL"]
 
