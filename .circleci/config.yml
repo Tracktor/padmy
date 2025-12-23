@@ -33,15 +33,15 @@ executors:
 
   build-docker:
     docker:
-      - image: cimg/python:3.13-node
+      - image: cimg/python:3.14-node
 
   build-wheel:
     docker:
-      - image: cimg/python:3.13-node
+      - image: cimg/python:3.14-node
 
   tests:
     docker:
-      - image: cimg/python:3.13-node
+      - image: cimg/python:3.14-node
         environment:
           PYRIGHT_PYTHON_GLOBAL_NODE: true
       - image: cimg/postgres:17.0-postgis

@@ -7,7 +7,7 @@
 #  - with networkx: docker buildx build --build-arg PG_VERSION=15 --build-arg UV_PARAMS="--group network" -t padmy:pg15 -f docker/Dockerfile .
 # Supported PG_VERSION values: 15, 16, 17
 #
-FROM ghcr.io/astral-sh/uv:python3.13-alpine AS builder
+FROM ghcr.io/astral-sh/uv:python3.14-alpine AS builder
 
 WORKDIR /app
 
@@ -30,7 +30,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev ${UV_PARAMS}
 
 
-FROM python:3.13-alpine AS main
+FROM python:3.14-alpine AS main
 
 
 WORKDIR /app
@@ -48,7 +48,7 @@ RUN if [ "$PG_VERSION" = "15" ]; then \
     addgroup user && \
     adduser -s /bin/bash -D -G user user
 
-COPY --from=builder /usr/local/lib/python3.13/site-packages/ /usr/local/lib/python3.13/site-packages/
+COPY --from=builder /usr/local/lib/python3.14/site-packages/ /usr/local/lib/python3.14/site-packages/
 COPY --from=builder /usr/local/bin/ /usr/local/bin/
 
 COPY padmy/ padmy/
