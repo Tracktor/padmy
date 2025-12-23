@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import asyncio
 import functools
+import sys
 from dataclasses import dataclass, field
 
 import asyncpg
@@ -7,9 +10,8 @@ from rich.table import Table as RTable
 
 from padmy.config import Config, ConfigTable, ConfigSchema
 from padmy.logs import logs
-from padmy.utils import get_first, get_conn
+from padmy.utils import get_first, get_conn, PgConnection
 from padmy.env import CONSOLE
-import sys
 
 if sys.version_info < (3, 11):
     from typing_extensions import Self
@@ -168,7 +170,7 @@ class Table:
             fk.schema = self.schema
 
 
-async def get_tables(conn: asyncpg.Connection, schemas: list[str]):
+async def get_tables(conn: PgConnection, schemas: list[str]):
     query = """
     SELECT 
     table_schema AS schema, 
@@ -182,7 +184,7 @@ async def get_tables(conn: asyncpg.Connection, schemas: list[str]):
     return [Table(**x) for x in data]
 
 
-async def get_columns(conn: asyncpg.Connection, tables: list[Table]) -> dict[str, list[Column]]:
+async def get_columns(conn: PgConnection, tables: list[Table]) -> dict[str, list[Column]]:
     query = """
     SELECT full_name,
            JSON_AGG(
@@ -239,7 +241,7 @@ WHERE constraint_type = 'PRIMARY KEY' AND tc.table_schema = ANY ($1::TEXT[]);
 """
 
 
-async def load_foreign_keys(conn: asyncpg.Connection, schemas: list[str]):
+async def load_foreign_keys(conn: PgConnection, schemas: list[str]):
     data = await conn.fetch(SCHEMA_FK_QUERY, schemas)
     return [
         FKConstraint(
@@ -255,7 +257,7 @@ async def load_foreign_keys(conn: asyncpg.Connection, schemas: list[str]):
     ]
 
 
-async def load_primary_keys(conn: asyncpg.Connection, schemas: list[str]):
+async def load_primary_keys(conn: PgConnection, schemas: list[str]):
     data = await conn.fetch(SCHEMA_PK_QUERY, schemas)
     return [PKConstraint(**x) for x in data]
 
