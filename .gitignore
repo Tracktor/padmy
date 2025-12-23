@@ -156,3 +156,9 @@ cython_debug/
 requirements.txt
 image.tar
 scratch/
+
+
+.claude/
+.gemini/
+CLAUDE.md
+GEMINI.md

@@ -4,7 +4,25 @@ version = "0.24.3"
 authors = [
     { email = "julien.brayere@tracktor.fr" }
 ]
-requires-python = ">=3.10"
+readme = "README.md"
+
+homepage = "https://github.com/tracktor/padmy"
+repository = "https://github.com/tracktor/padmy"
+keywords = ["utility"]
+include = [
+    "LICENSE"
+]
+requires-python = ">=3.12,<4.0"
+
+classifiers = [
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+
+
 dependencies = [
     "piou >=0.21.0,<1.0.0",
     "asyncpg >=0.29.0,<1.0.0",
@@ -65,7 +83,7 @@ python_files = "*.py"
 include = ["padmy", "tests"]
 exclude = []
 
-pythonVersion = "3.13"
+pythonVersion = "3.14"
 pythonPlatform = "Linux"
 useLibraryCodeForTypes = true
 
@@ -82,7 +100,7 @@ bump_message = "release $current_version → $new_version [skip ci]"
 
 [tool.ruff]
 line-length = 120
-target-version = "py313"
+target-version = "py314"
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = [

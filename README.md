@@ -1,10 +1,15 @@
 # Padmy
 
+[![Python versions](https://img.shields.io/pypi/pyversions/padmy)](https://pypi.python.org/pypi/padmy)
+[![Latest PyPI version](https://img.shields.io/pypi/v/padmy?logo=pypi)](https://pypi.python.org/pypi/padmy)
+[![CircleCI](https://circleci.com/gh/Tracktor/padmy/tree/master.svg?style=shield)](https://app.circleci.com/pipelines/github/Tracktor/padmy?branch=master)
+
 CLI utility functions for Postgresql such as **sampling** and **anonymization**.
 
 ## Installation
 
 Just run
+
 ```bash
 uv add padmy
 ```
@@ -122,8 +127,6 @@ uvx padmy -v migrate new-sql 1 --sql-dir /tmp/sql
 tree /tmp/sql
 ```  
 
-
-
 Add `CREATE SCHEMA general;` to the file.
 
 ```bash
@@ -231,8 +234,8 @@ You can compare two databases by running:
 ```bash
 uvx padmy -vv schema-diff --db tracktor --schemas schema_1,schema_2
 ```
-If differences are found, the command will output the differences between the two databases.
 
+If differences are found, the command will output the differences between the two databases.
 
 ### Known limitations
 
