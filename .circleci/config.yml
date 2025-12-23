@@ -72,7 +72,7 @@ jobs:
           before-steps:
             - run:
                 name: Install dependencies
-                command: uv sync --locked --group network --dev
+                command: uv sync --locked --group network --dev --group anonymize
             - run:
                 name: Initializing DB
                 command: ./tests/static/init-pg.sh
@@ -202,6 +202,18 @@ workflows:
       - build-publish-docker:
           name: build-publish-docker-network-17
           pg_version: "17"
+          include_network: true
+          context: *production_context
+          filters: *filters_only_tags
+      # PostgreSQL 18
+      - build-publish-docker:
+          name: build-publish-docker-18
+          pg_version: "18"
+          context: *production_context
+          filters: *filters_only_tags
+      - build-publish-docker:
+          name: build-publish-docker-network-18
+          pg_version: "18"
           include_network: true
           context: *production_context
           filters: *filters_only_tags

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import contextlib
 import json
 import os
@@ -12,6 +14,8 @@ from pathlib import Path
 from typing import Sequence, AsyncIterator, Callable, TypeVar, cast, Literal
 
 import asyncpg
+from asyncpg import Connection
+from asyncpg.pool import PoolConnectionProxy
 from piou import Option, Password
 
 from padmy import env
@@ -28,6 +32,8 @@ from .env import (
     PG_SSL_PASSWORD,
 )
 from .logs import logs
+
+type PgConnection = Connection | PoolConnectionProxy
 
 PgHost = Option(PG_HOST, "--host", help="PG Host")
 PgPort = Option(PG_PORT, "--port", help="PG Port")
