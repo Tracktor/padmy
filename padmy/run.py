@@ -4,8 +4,14 @@ import sys
 import tempfile
 from pathlib import Path
 
-from faker import Faker
+
 from piou import Cli, Derived, Option
+
+try:
+    from faker import Faker
+except ImportError:
+    Faker = None  # type: ignore[assignment,misc]
+
 
 from padmy.anonymize import anonymize_db
 from padmy.config import Config
@@ -46,8 +52,11 @@ async def ano_main(
     db_name: str = Option(..., "--db", help="Database to anonymize"),
     config_path: Path = Option(..., "-f", "--file", help="Path to the configuration file"),
 ):
-    config = Config.load_from_file(config_path)
+    if Faker is None:
+        raise ImportError('Please install faker or padmy with "anonymize" to use this module')
     faker = Faker()
+
+    config = Config.load_from_file(config_path)
     async with pg_infos.get_pool(db_name) as pool:
         await anonymize_db(pool, config, faker)
 
