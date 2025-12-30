@@ -4,14 +4,13 @@ import asyncio
 import itertools
 import operator
 from functools import partial
-from typing import Any, Iterator
+from typing import Any, Iterator, TYPE_CHECKING
 
 import asyncpg
 
-try:
+
+if TYPE_CHECKING:
     from faker import Faker
-except ImportError:
-    raise ImportError('Please install faker or padmy with "anonymize" to use this module')
 
 from padmy.logs import logs
 from ..config import Config, ConfigTable, FieldType, AnoFields
