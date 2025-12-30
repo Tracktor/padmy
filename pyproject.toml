@@ -1,6 +1,6 @@
 [project]
 name = "padmy"
-version = "0.25.1"
+version = "0.25.2"
 authors = [
     { email = "julien.brayere@tracktor.fr" }
 ]
@@ -91,7 +91,7 @@ useLibraryCodeForTypes = true
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.25.1"
+version = "0.25.2"
 tag_format = "$version"
 version_files = [
     "pyproject.toml:version"
