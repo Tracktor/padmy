@@ -41,6 +41,25 @@ def _get_fake_value(faker: Faker, field: FieldType, extra_fields: dict | None = 
     match field:
         case "EMAIL":
             return faker.email(**_extra_fields)
+        case "NULL":
+            # Drop the column to NULL. Useful when no realistic placeholder is
+            # wanted (password hashes, tokens, secrets) — the column shape is
+            # preserved but the value carries no information.
+            return None
+        case "FIRST_NAME":
+            return faker.first_name(**_extra_fields)
+        case "LAST_NAME":
+            return faker.last_name(**_extra_fields)
+        case "NAME":
+            return faker.name(**_extra_fields)
+        case "PHONE_NUMBER":
+            return faker.phone_number(**_extra_fields)
+        case "DATE_OF_BIRTH":
+            return faker.date_of_birth(**_extra_fields)
+        case "TEXT":
+            return faker.text(**_extra_fields)
+        case "WORD":
+            return faker.word(**_extra_fields)
         case _:
             raise ValueError(f"Got unimplemented field type {field!r}")
 

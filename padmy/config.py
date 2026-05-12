@@ -4,7 +4,17 @@ from typing import Literal
 
 import yaml
 
-FieldType = Literal["EMAIL"]
+FieldType = Literal[
+    "EMAIL",
+    "NULL",
+    "FIRST_NAME",
+    "LAST_NAME",
+    "NAME",
+    "PHONE_NUMBER",
+    "DATE_OF_BIRTH",
+    "TEXT",
+    "WORD",
+]
 
 SampleType = float | int
 

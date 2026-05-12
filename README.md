@@ -102,7 +102,50 @@ tables:
     sample: 10
 ```
 
-## 3. Migration utils
+## 3. Anonymization
+
+You can scrub PII from selected columns with `padmy anonymize`. Field types map
+to Faker generators (or `NULL` to blank the column). Available types:
+
+| Type | Behavior |
+| --- | --- |
+| `EMAIL` | `faker.email()` — supports `domain:` extra arg |
+| `NULL` | Sets the column to `NULL` (useful for hashes, tokens, anything you don't want to fake) |
+| `FIRST_NAME` | `faker.first_name()` |
+| `LAST_NAME` | `faker.last_name()` |
+| `NAME` | `faker.name()` (full name) |
+| `PHONE_NUMBER` | `faker.phone_number()` |
+| `DATE_OF_BIRTH` | `faker.date_of_birth()` — supports `minimum_age:` / `maximum_age:` |
+| `TEXT` | `faker.text()` — supports `max_nb_chars:` |
+| `WORD` | `faker.word()` |
+
+Example config:
+
+```yaml
+tables:
+  - schema: public
+    table: users
+    fields:
+      - column: email
+        type: EMAIL
+        domain: example.com         # extra arg forwarded to faker.email
+      - column: password_hash
+        type: "NULL"                # quoted: YAML's bare NULL parses as null
+      - column: first_name
+        type: FIRST_NAME
+      - column: birthdate
+        type: DATE_OF_BIRTH
+        minimum_age: 18
+        maximum_age: 80
+```
+
+Run with:
+
+```bash
+uvx padmy anonymize --db test -f config.yml
+```
+
+## 4. Migration utils
 
 **Setting up**
 
@@ -227,7 +270,7 @@ We are all good !
 uvx padmy -vv migrate verify-files --sql-dir /tmp/migrations --no-raise
 ```
 
-## 4. Comparing databases schemas
+## 5. Comparing databases schemas
 
 You can compare two databases by running:
 

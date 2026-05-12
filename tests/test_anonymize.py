@@ -78,6 +78,33 @@ def test_anonymize_table(aengine, loop, engine, faker):
     ]
 
 
+@pytest.mark.parametrize(
+    "field_type, extra, predicate",
+    [
+        pytest.param("EMAIL", None, lambda v: v and "@" in v, id="EMAIL"),
+        pytest.param("NULL", None, lambda v: v is None, id="NULL"),
+        pytest.param("FIRST_NAME", None, lambda v: isinstance(v, str) and v, id="FIRST_NAME"),
+        pytest.param("LAST_NAME", None, lambda v: isinstance(v, str) and v, id="LAST_NAME"),
+        pytest.param("NAME", None, lambda v: isinstance(v, str) and " " in v, id="NAME"),
+        pytest.param("PHONE_NUMBER", None, lambda v: isinstance(v, str) and v, id="PHONE_NUMBER"),
+        pytest.param("WORD", None, lambda v: isinstance(v, str) and v, id="WORD"),
+    ],
+)
+def test_get_fake_value(faker, field_type, extra, predicate):
+    """Each supported field type returns something matching its shape."""
+    from padmy.anonymize.anonymize import _get_fake_value
+
+    value = _get_fake_value(faker, field_type, extra)
+    assert predicate(value), f"unexpected value for {field_type}: {value!r}"
+
+
+def test_get_fake_value_unknown_type_raises(faker):
+    from padmy.anonymize.anonymize import _get_fake_value
+
+    with pytest.raises(ValueError, match="unimplemented field type"):
+        _get_fake_value(faker, "DOES_NOT_EXIST")  # type: ignore[arg-type]
+
+
 @pytest.mark.usefixtures("add_table_1_data")
 def test_anonymize_db(apool, engine, loop, faker):
     from padmy.anonymize import anonymize_db
