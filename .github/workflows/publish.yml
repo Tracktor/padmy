@@ -1,0 +1,95 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  pypi:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Build
+        run: uv build
+
+      - name: Publish
+        run: uv publish --token ${{ secrets.PYPI_TOKEN }}
+
+  docker:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        pg_version: ["15", "16", "17", "18"]
+        include_network: [false, true]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute tags and build args
+        id: meta
+        run: |
+          set -euo pipefail
+          IMG="${{ env.REGISTRY }}/${IMAGE_NAME,,}"
+          PG="${{ matrix.pg_version }}"
+          NET="${{ matrix.include_network }}"
+          VERSION="${{ github.ref_name }}"
+
+          if [[ "${NET}" == "true" ]]; then
+            VARIANT="network-${PG}"
+            BUILD_ARGS=$'PG_VERSION='"${PG}"$'\nUV_PARAMS=--group network'
+          else
+            VARIANT="${PG}"
+            BUILD_ARGS="PG_VERSION=${PG}"
+          fi
+
+          {
+            echo "tags<<EOF"
+            echo "${IMG}:${VERSION}-${VARIANT}"
+            echo "${IMG}:latest-${VARIANT}"
+            echo "EOF"
+            echo "build_args<<EOF"
+            printf '%s\n' "${BUILD_ARGS}"
+            echo "EOF"
+            echo "scope=${VARIANT}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: true
+          build-args: ${{ steps.meta.outputs.build_args }}
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha,scope=${{ steps.meta.outputs.scope }}
+          cache-to: type=gha,scope=${{ steps.meta.outputs.scope }},mode=max
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.description=padmy CLI (PostgreSQL ${{ matrix.pg_version }}${{ matrix.include_network && ', network extras' || '' }})
+            org.opencontainers.image.licenses=MIT

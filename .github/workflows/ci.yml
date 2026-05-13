@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+    tags-ignore: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync --locked --group dev --group network --group anonymize
+
+      - name: Init database
+        run: psql postgresql://postgres:postgres@localhost/test -f tests/static/setup.sql
+
+      - name: Format
+        run: uv run ruff format --check padmy tests
+
+      - name: Lint
+        run: uv run ruff check padmy tests
+
+      - name: Type check
+        run: uv run pyright
+        env:
+          PYRIGHT_PYTHON_GLOBAL_NODE: "true"
+
+      - name: Tests
+        run: uv run pytest
+        env:
+          PG_HOST: localhost
+
+  bump:
+    needs: test
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.BUMP_TOKEN }}
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Configure git
+        run: |
+          git config user.email "${{ vars.CI_EMAIL }}"
+          git config user.name "${{ vars.CI_USER }}"
+
+      - name: Bump version
+        id: bump
+        run: |
+          set -euo pipefail
+          uv run --only-group=bump cz bump --yes && bumped=true || code=$?
+          if [[ "${bumped:-}" != "true" ]]; then
+            if [[ "${code:-0}" -eq 21 ]]; then
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+            else
+              exit "${code:-1}"
+            fi
+          fi
+
+      - name: Update lockfile and build
+        if: steps.bump.outputs.skip != 'true'
+        run: |
+          VERSION=$(uv version --short)
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          uv run cz changelog "$VERSION"
+          uv lock
+          git add uv.lock CHANGELOG.md
+          git commit --amend --no-edit
+          uv build
+
+      - name: Push and release
+        if: steps.bump.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.BUMP_TOKEN }}
+        run: |
+          git push origin master --follow-tags
+          gh release create "$VERSION" ./dist/*.whl -F CHANGELOG.md --title "$VERSION"
