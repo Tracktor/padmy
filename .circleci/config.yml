@@ -6,7 +6,7 @@ orbs:
 
 references:
   production_context: &production_context
-    - docker
+    - ghcr
     - github
   pypi_context: &pypi_context
     - pypi
@@ -103,16 +103,18 @@ jobs:
             VERSION=$(uv version --short)
             echo "export VERSION=$VERSION" >> $BASH_ENV
             echo "Building version: $VERSION"
+      - run:
+          name: Log in to GHCR
+          command: echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
       - attach_workspace:
           at: .
       - sre/build-docker:
           dockerfile: './docker/Dockerfile'
-          image_name: 'tracktor/padmy'
+          image_name: 'ghcr.io/tracktor/padmy'
           tag: <<# parameters.include_network >>${VERSION}-network-<< parameters.pg_version >><</ parameters.include_network >><<^ parameters.include_network >>${VERSION}-<< parameters.pg_version >><</ parameters.include_network >>
           latest_tag: <<# parameters.include_network >>latest-network-<< parameters.pg_version >><</ parameters.include_network >><<^ parameters.include_network >>latest-<< parameters.pg_version >><</ parameters.include_network >>
+          cache_tag: <<# parameters.include_network >>cache-network-<< parameters.pg_version >><</ parameters.include_network >><<^ parameters.include_network >>cache-<< parameters.pg_version >><</ parameters.include_network >>
           publish: true
-          registry_pwd: $CONTAINER_REGISTRY_PWD
-          registry_user: $CONTAINER_REGISTRY_USER
           build_params: --build-arg PG_VERSION=<< parameters.pg_version >><<# parameters.include_network >> --build-arg UV_PARAMS="--group network"<</ parameters.include_network >>
 
 
