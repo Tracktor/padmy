@@ -91,7 +91,7 @@ jobs:
           branch="release/$version"
           git tag -d "$version"
           git checkout -b "$branch"
-          git push origin "$branch"
+          git push origin "$branch" --force
           gh pr create \
             --title "release $version" \
             --body "Automated version bump to $version." \
