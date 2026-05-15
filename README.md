@@ -2,7 +2,7 @@
 
 [![Python versions](https://img.shields.io/pypi/pyversions/padmy)](https://pypi.python.org/pypi/padmy)
 [![Latest PyPI version](https://img.shields.io/pypi/v/padmy?logo=pypi)](https://pypi.python.org/pypi/padmy)
-[![CircleCI](https://circleci.com/gh/Tracktor/padmy/tree/master.svg?style=shield)](https://app.circleci.com/pipelines/github/Tracktor/padmy?branch=master)
+[![CI](https://github.com/soren/padmy/actions/workflows/ci.yml/badge.svg)](https://github.com/soren/padmy/actions)
 
 CLI utility functions for Postgresql such as **sampling** and **anonymization**.
 
@@ -27,7 +27,7 @@ or using the docker image
 ```bash
  docker run -it \
    --network host \
-   tracktor/padmy:latest analyze --db test --schemas test
+   ghcr.io/soren/padmy:latest analyze --db test --schemas test
 ```
 
 For instance, the following table definition will output:
@@ -275,7 +275,7 @@ uvx padmy -vv migrate verify-files --sql-dir /tmp/migrations --no-raise
 You can compare two databases by running:
 
 ```bash
-uvx padmy -vv schema-diff --db tracktor --schemas schema_1,schema_2
+uvx padmy -vv schema-diff --db soren --schemas schema_1,schema_2
 ```
 
 If differences are found, the command will output the differences between the two databases.
