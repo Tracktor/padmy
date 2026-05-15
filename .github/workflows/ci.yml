@@ -81,6 +81,9 @@ jobs:
             [ $code -eq 21 ] && echo "Nothing to bump, skipping" && exit 0
             exit $code
           }
+          uv lock
+          git add uv.lock
+          git commit --amend --no-edit
           echo "version=$(git describe --tags --abbrev=0)" >> "$GITHUB_OUTPUT"
       - name: Open release PR
         if: steps.bump.outputs.version
