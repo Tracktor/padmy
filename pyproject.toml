@@ -2,12 +2,12 @@
 name = "padmy"
 version = "0.26.0"
 authors = [
-    { email = "julien.brayere@tracktor.fr" }
+    { email = "julien.brayere@soren.fr" }
 ]
 readme = "README.md"
 
-homepage = "https://github.com/tracktor/padmy"
-repository = "https://github.com/tracktor/padmy"
+homepage = "https://github.com/Getsoren/padmy"
+repository = "https://github.com/Getsoren/padmy"
 keywords = ["utility"]
 include = [
     "LICENSE"

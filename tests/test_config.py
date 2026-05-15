@@ -74,7 +74,7 @@ tables:
       - column: bar
         type: EMAIL
         # Extra args
-        domain_name: tracktor.fr
+        domain_name: soren.fr
 """
 
 
@@ -89,7 +89,7 @@ def get_custom_fields_expected():
                     AnoFields(
                         column="bar",
                         type="EMAIL",
-                        extra_args={"domain_name": "tracktor.fr"},
+                        extra_args={"domain_name": "soren.fr"},
                     )
                 ],
             ),
