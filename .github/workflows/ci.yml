@@ -90,14 +90,21 @@ jobs:
           version="${{ steps.bump.outputs.version }}"
           branch="release/$version"
           git tag -d "$version"
-          git checkout -b "$branch"
-          git push origin --delete "$branch" 2>/dev/null || true
-          git push origin "$branch"
+          # If PR already open for this version, nothing to do
           existing=$(gh pr list --head "$branch" --json number --jq '.[0].number // empty')
-          if [ -z "$existing" ]; then
-            gh pr create \
-              --title "release $version" \
-              --body "Automated version bump to $version." \
-              --base master \
-              --head "$branch"
+          if [ -n "$existing" ]; then
+            echo "PR #$existing already open for $version, skipping"
+            exit 0
           fi
+          # If branch exists on remote (stale from a previous run), reuse it
+          if git ls-remote --heads origin "$branch" | grep -q .; then
+            echo "Branch $branch already exists, creating PR on it"
+          else
+            git checkout -b "$branch"
+            git push origin "$branch"
+          fi
+          gh pr create \
+            --title "release $version" \
+            --body "Automated version bump to $version." \
+            --base master \
+            --head "$branch"
