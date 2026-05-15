@@ -6,8 +6,8 @@ authors = [
 ]
 readme = "README.md"
 
-homepage = "https://github.com/soren/padmy"
-repository = "https://github.com/soren/padmy"
+homepage = "https://github.com/Getsoren/padmy"
+repository = "https://github.com/Getsoren/padmy"
 keywords = ["utility"]
 include = [
     "LICENSE"

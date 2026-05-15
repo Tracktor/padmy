@@ -1,5 +1,5 @@
 variable "REGISTRY" {
-  default = "ghcr.io/soren"
+  default = "ghcr.io/getsoren"
 }
 
 variable "VERSION" {
