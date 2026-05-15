@@ -53,16 +53,19 @@ jobs:
         run: uv run pytest
 
   bump:
-    if: github.ref == 'refs/heads/master'
+    if: |
+      github.ref == 'refs/heads/master' &&
+      !startsWith(github.event.head_commit.message, 'release ')
     needs: tests
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.BUMP_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: astral-sh/setup-uv@v5
       - name: Install bump tools
         run: uv sync --locked --group bump
@@ -71,11 +74,26 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
       - name: Bump version
+        id: bump
         run: |
           uv run cz bump --yes || {
             code=$?
             [ $code -eq 21 ] && echo "Nothing to bump, skipping" && exit 0
             exit $code
           }
-      - name: Push
-        run: git push --follow-tags
+          echo "version=$(git describe --tags --abbrev=0)" >> "$GITHUB_OUTPUT"
+      - name: Open release PR
+        if: steps.bump.outputs.version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${{ steps.bump.outputs.version }}"
+          branch="release/$version"
+          git tag -d "$version"
+          git checkout -b "$branch"
+          git push origin "$branch"
+          gh pr create \
+            --title "release $version" \
+            --body "Automated version bump to $version." \
+            --base master \
+            --head "$branch"
