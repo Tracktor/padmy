@@ -5,6 +5,16 @@ on:
     tags: ['*']
 
 jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Create GitHub release
+        run: gh release create "${{ github.ref_name }}" --generate-notes --repo "${{ github.repository }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   pypi:
     runs-on: ubuntu-latest
     environment: pypi
