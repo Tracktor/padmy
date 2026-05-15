@@ -59,14 +59,13 @@ jobs:
     needs: tests
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      pull-requests: write
+      contents: read
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
           fetch-tags: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.BUMP_TOKEN }}
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
       - name: Install bump tools
         run: uv sync --locked --group bump
@@ -82,33 +81,14 @@ jobs:
             [ $code -eq 21 ] && echo "Nothing to bump, skipping" && exit 0
             exit $code
           }
+          version="$(git describe --tags --abbrev=0)"
           uv lock
-          git add uv.lock
-          git commit --amend --no-edit
-          echo "version=$(git describe --tags --abbrev=0)" >> "$GITHUB_OUTPUT"
-      - name: Open release PR
+          if ! git diff --quiet -- uv.lock; then
+            git add uv.lock
+            git commit --amend --no-edit
+            git tag -f "$version"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Push release commit and tag
         if: steps.bump.outputs.version
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          version="${{ steps.bump.outputs.version }}"
-          branch="release/$version"
-          git tag -d "$version"
-          # If PR already open for this version, nothing to do
-          existing=$(gh pr list --head "$branch" --json number --jq '.[0].number // empty')
-          if [ -n "$existing" ]; then
-            echo "PR #$existing already open for $version, skipping"
-            exit 0
-          fi
-          # If branch exists on remote (stale from a previous run), reuse it
-          if git ls-remote --heads origin "$branch" | grep -q .; then
-            echo "Branch $branch already exists, creating PR on it"
-          else
-            git checkout -b "$branch"
-            git push origin "$branch"
-          fi
-          gh pr create \
-            --title "release $version" \
-            --body "Automated version bump to $version." \
-            --base master \
-            --head "$branch"
+        run: git push --atomic origin HEAD:master "refs/tags/${{ steps.bump.outputs.version }}"
