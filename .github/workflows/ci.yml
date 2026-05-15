@@ -91,9 +91,13 @@ jobs:
           branch="release/$version"
           git tag -d "$version"
           git checkout -b "$branch"
-          git push origin "$branch" --force
-          gh pr create \
-            --title "release $version" \
-            --body "Automated version bump to $version." \
-            --base master \
-            --head "$branch"
+          git push origin --delete "$branch" 2>/dev/null || true
+          git push origin "$branch"
+          existing=$(gh pr list --head "$branch" --json number --jq '.[0].number // empty')
+          if [ -z "$existing" ]; then
+            gh pr create \
+              --title "release $version" \
+              --body "Automated version bump to $version." \
+              --base master \
+              --head "$branch"
+          fi
