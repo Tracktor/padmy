@@ -65,7 +65,7 @@ class ConfigTable:
 
     @property
     def has_ano_fields(self):
-        return self.fields is not None
+        return bool(self.fields)
 
     @classmethod
     def load(cls, table: dict):

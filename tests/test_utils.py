@@ -348,3 +348,33 @@ class TestErrorMessageExtraction:
         from padmy.utils import extract_pg_error
 
         assert extract_pg_error(data) == expected
+
+
+class TestGetPgEnvs:
+    def test_honors_temp_env_overrides(self, monkeypatch):
+        # temp_env sets PGHOST/PGPORT/... in os.environ; get_pg_envs must
+        # surface those, otherwise --host-to / --port-to are silently lost.
+        from padmy.utils import PGConnectionInfo, get_pg_envs
+
+        for k in ("PGHOST", "PGPORT", "PGUSER", "PGPASSWORD"):
+            monkeypatch.delenv(k, raising=False)
+
+        info = PGConnectionInfo(pg_host="target.example", pg_port=6543, pg_user="alice", pg_password="s3cret")
+        with info.temp_env(include_database=False):
+            envs = get_pg_envs()
+
+        assert envs["PGHOST"] == "target.example"
+        assert envs["PGPORT"] == "6543"
+        assert envs["PGUSER"] == "alice"
+        assert envs["PGPASSWORD"] == "s3cret"
+
+    def test_falls_back_to_env_module_defaults(self, monkeypatch):
+        from padmy.utils import get_pg_envs
+
+        for k in ("PGHOST", "PGPORT", "PGUSER", "PGPASSWORD"):
+            monkeypatch.delenv(k, raising=False)
+
+        envs = get_pg_envs()
+        # env.PG_HOST defaults to "localhost", env.PG_PORT to 5432
+        assert envs["PGHOST"] == "localhost"
+        assert envs["PGPORT"] == "5432"

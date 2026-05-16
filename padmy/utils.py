@@ -167,12 +167,20 @@ def create_ssl_context(
 
 
 def get_pg_envs():
+    """Build the libpq env dict passed to subprocess calls (pg_dump, createdb, …).
+
+    Prefer values already set in os.environ — `PGConnectionInfo.temp_env`
+    populates PGHOST/PGPORT/PGUSER/PGPASSWORD inside its `with` block so that
+    `--host-to` / `PG_PORT_TO` overrides flow through. Falling back to the
+    `env` module defaults (PG_HOST / PG_PORT) only when libpq vars aren't set
+    keeps the standalone CLI path working.
+    """
     reload(env)
     envs = {
-        "PGPASSWORD": env.PG_PASSWORD,
-        "PGUSER": env.PG_USER,
-        "PGHOST": env.PG_HOST,
-        "PGPORT": str(env.PG_PORT),
+        "PGPASSWORD": os.environ.get("PGPASSWORD", env.PG_PASSWORD),
+        "PGUSER": os.environ.get("PGUSER", env.PG_USER),
+        "PGHOST": os.environ.get("PGHOST", env.PG_HOST),
+        "PGPORT": os.environ.get("PGPORT", str(env.PG_PORT)),
     }
     # Add SSL environment variables if configured
     if PG_SSL_MODE:

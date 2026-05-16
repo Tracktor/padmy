@@ -268,8 +268,8 @@ async def sample_database(
         logs.info("Creating temporary tables")
         await create_temp_tables(conn, db.tables)
 
-        # Safety check
-        _not_processed_tables = [x.full_name for x in db.tables if not x.has_been_processed]
+        # Safety check + ignore tables
+        _not_processed_tables = [x.full_name for x in db.tables if not x.has_been_processed and not x.ignore]
         if _not_processed_tables:
             raise NotImplementedError(
                 f"Found {len(_not_processed_tables)} tables that has not been "
@@ -280,6 +280,8 @@ async def sample_database(
         if show_progress:
             logs.info("Loading tables count")
             for table in db.tables:
+                if table.ignore:
+                    continue
                 _count = await conn.fetchval(f"SELECT count(*) from {table.tmp_name}")
                 if _count is None:
                     raise ValueError("Got empty count")
@@ -291,6 +293,11 @@ async def sample_database(
                 task1 = progress.add_task("[green]Inserting tables....", total=len(db.tables))
                 task2 = progress.add_task("[purple]Inserting chunks....") if show_progress else None
                 for table in db.tables:
+                    # Skip ignored tables — they have no temp table and we
+                    # don't want them in the sampled output.
+                    if table.ignore:
+                        progress.update(task1, advance=1)
+                        continue
                     logs.debug(f"Inserting to {table.full_name}")
                     if task2 is not None:
                         progress.reset(task2, total=_table_count[table.tmp_name])
