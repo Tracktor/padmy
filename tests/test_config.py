@@ -149,3 +149,17 @@ def test_load_config():
     )
     config = Config.load(sample=20, schemas=["schema_1", "schema_2"])
     assert asdict(config) == asdict(expected), pprint_dataclass_diff(config, expected)
+
+
+def test_has_ano_fields_false_when_no_fields():
+    from padmy.config import ConfigTable
+
+    assert ConfigTable(schema="public", table="t").has_ano_fields is False
+    assert ConfigTable(schema="public", table="t", fields=[]).has_ano_fields is False
+
+
+def test_has_ano_fields_true_when_fields_present():
+    from padmy.config import AnoFields, ConfigTable
+
+    t = ConfigTable(schema="public", table="t", fields=[AnoFields(column="email", type="EMAIL")])
+    assert t.has_ano_fields is True
